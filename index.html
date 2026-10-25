@@ -66,6 +66,39 @@ var API_ADM='https://script.google.com/macros/s/AKfycbzPNqOlPMgP1lme__szBCxU4kzz
 
 var PIN='';try{PIN=localStorage.getItem('gaussPinCSA')||localStorage.getItem('gaussPin')||'';}catch(e){}
 var LISTA=[],FC=null,FI=null,FB=null,PICK=null,PICK_CB=null,ACTUAL=null;
+// ⚡ Supabase: copia rápida (solo lectura). Si falla o no está, se usa la planilla como siempre.
+var SB_URL='https://heycvwxaewjbwbusddqg.supabase.co',SB_KEY='sb_publishable_MpClcQrbgiAtqcsaa5js3w_XCYqHztI';
+var NAV=0,TOCADO=false,NUEVO=null;
+function sbLeer(tipo,clave,ok,mal){
+ if(!PIN){mal();return;}
+ var hecho=false,to=setTimeout(function(){if(!hecho){hecho=true;mal();}},4000);
+ fetch(SB_URL+'/rest/v1/rpc/gauss_leer',{method:'POST',headers:{'apikey':SB_KEY,'Content-Type':'application/json'},
+  body:JSON.stringify({p_pin:PIN,p_tipo:tipo,p_clave:String(clave)})})
+ .then(function(r){return r.json();})
+ .then(function(d){if(hecho)return;hecho=true;clearTimeout(to);if(d&&d.datos)ok(d.datos,d.t);else mal();})
+ .catch(function(){if(hecho)return;hecho=true;clearTimeout(to);mal();});}
+function estable(o){if(Array.isArray(o))return '['+o.map(estable).join(',')+']';
+ if(o&&typeof o==='object')return '{'+Object.keys(o).filter(function(k){return k!=='_ms'&&k!=='_total'&&o[k]!==undefined;}).sort()
+  .map(function(k){return JSON.stringify(k)+':'+estable(o[k]);}).join(',')+'}';
+ return JSON.stringify(o);}
+function haceCuanto(t){var m=Math.round((Date.now()-new Date(t).getTime())/60000);return isNaN(m)?'':(m<1?'recién':m<60?'hace '+m+' min':'hace '+Math.round(m/60)+' h');}
+function sbMarca(h){var m=el('sbMarca');if(!m){m=document.createElement('div');m.id='sbMarca';m.style.cssText='font-size:12px;color:#777;text-align:center;margin:0 0 8px';
+  var a=el('app');a.parentNode.insertBefore(m,a);}m.innerHTML=h||'';}
+// Muestra la copia de Supabase al instante y después confirma con la planilla.
+// "refresco" (opcional): qué hacer con los datos nuevos de la planilla (si no, se vuelve a usar "ok").
+function rapido(acc,params,tipo,clave,ok,mal,refresco){
+ var n=++NAV;sbMarca('');
+ sbLeer(tipo,clave,function(d,t){
+  if(n!==NAV)return;TOCADO=false;ok(d);sbMarca('⚡ Copia rápida ('+esc(haceCuanto(t))+') · confirmando con la planilla…');
+  pedir(acc,params,function(D){
+   if(n!==NAV)return;
+   if(estable(D)===estable(d)){sbMarca('✅ Confirmado con la planilla');setTimeout(function(){if(n===NAV)sbMarca('');},2500);return;}
+   var aplicar=function(){var y=window.scrollY;(refresco||ok)(D);window.scrollTo(0,y);sbMarca('');};
+   if(!TOCADO||refresco){aplicar();return;}
+   NUEVO=aplicar;sbMarca('<b style="color:#b45f06">🔄 La planilla tiene datos más nuevos.</b> <button onclick="NUEVO()" style="font-size:12px">Actualizar</button>');
+  },function(e){if(n!==NAV)return;if(String(e.message||'').indexOf('PIN:')>=0){mal(e);return;}
+   sbMarca('<span style="color:#c0392b">⚠️ No se pudo confirmar con la planilla (se ve la copia rápida).</span>');});
+ },function(){if(n===NAV)pedir(acc,params,function(D){if(n===NAV)ok(D);},function(e){if(n===NAV)mal(e);});});}
 function el(i){return document.getElementById(i);}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function sa(s){return String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');}
@@ -99,18 +132,21 @@ function pedirPin(m){el('volver').style.display='none';msg('');
  var i=el('pin');i.focus();i.onkeydown=function(ev){if(ev.key==='Enter')entrar();};}
 function entrar(){PIN=el('pin').value.trim();guardado('gaussPinCSA',PIN);cargar();}
 
-function cargar(){el('app').innerHTML='';msg('Cargando alumnos… (unos segundos)');
- pedir('lista',{},function(l){LISTA=l;inicio();
-  pedir('formCSA',{},function(d){FC=d;},function(){});},function(e){falla(e);});}
+function cargar(){el('app').innerHTML='';msg('Cargando alumnos…');
+ function listo(){inicio();pedir('formCSA',{},function(d){FC=d;},function(){});}
+ sbLeer('csaLista','todo',function(l){LISTA=l;listo();
+   pedir('lista',{},function(l2){LISTA=l2;},function(e){if(String(e.message||'').indexOf('PIN:')>=0)falla(e);});},
+  function(){pedir('lista',{},function(l){LISTA=l;listo();},function(e){falla(e);});});}
+el('app').addEventListener('input',function(){TOCADO=true;});
 cargar();
 function conFC(fn){if(FC)fn();else{msg('Cargando…');pedir('formCSA',{},function(d){FC=d;msg('');fn();},function(e){falla(e);});}}
-function pantalla(h){el('volver').style.display='inline-block';msg('');el('app').innerHTML=h;window.scrollTo(0,0);}
+function pantalla(h){NAV++;sbMarca('');el('volver').style.display='inline-block';msg('');el('app').innerHTML=h;window.scrollTo(0,0);}
 function hecho(t,botones){pantalla('<div class="card ok"><b class="big">✅ '+t+'</b>'+botones+
  '<button class="btn gr" onclick="inicio()">⬅ Volver al inicio</button></div>');}
 function botonPerfil(){return ACTUAL?'<button class="btn az" onclick="perfil(\''+esc(ACTUAL[1])+'\')">👤 Volver al perfil de '+esc(nombreDe(ACTUAL))+'</button>':'';}
 
 // ---------- INICIO ----------
-function inicio(){el('volver').style.display='none';msg('');window.scrollTo(0,0);ACTUAL=null;
+function inicio(){NAV++;sbMarca('');el('volver').style.display='none';msg('');window.scrollTo(0,0);ACTUAL=null;
  el('app').innerHTML='<div class="botones">'+
   '<button class="bgrande" style="background:#1f4e79" onclick="buscarPerfil()">👤 Perfil del alumno<small>Asistencia, notas, seguimiento · informe para padres</small></button>'+
   '<button class="bgrande" style="background:#00838f" onclick="listaGrupo()">📊 Resumen de grupo<small>Semáforo, asistencia, notas y deuda de cada alumno</small></button>'+
@@ -156,7 +192,7 @@ function tabla(tit,enc,filas,colNota,D,extra){
   return '<td class="'+cl+'">'+esc(c)+'</td>';}).join('')+'</tr>';});
  return h+'</table></div>'+(extra||'')+'</div>';}
 function perfil(id){var a0=alumno(id);ACTUAL=a0||ACTUAL;pantalla('');msg('Cargando perfil…');
- pedir('ficha',{id:id},pintarPerfil,function(e){falla(e);});}
+ rapido('ficha',{id:id},'csaFicha',id,pintarPerfil,function(e){falla(e);});}
 function pintarPerfil(D){var a=D.a,id=a['ID'];msg('');
  var nom=String(a['ALUMNO']).split(' · ').slice(1).join(' · ');
  var sc=a['🚦']==='🔴'?'r':(a['🚦']==='🟡'?'y':(a['🚦']==='🟢'?'g':''));
@@ -217,7 +253,7 @@ function informe(id){var b=el('bInf'),r=el('resInf');b.disabled=true;b.textConte
 
 // ---------- 📋 TODA LA ASISTENCIA ----------
 function asistencia(id){var a=alumno(id);if(a)ACTUAL=a;pantalla('');msg('Cargando toda la asistencia…');
- pedir('asistencia',{id:id},function(D){msg('');
+ rapido('asistencia',{id:id},'csaAsis',id,function(D){msg('');
   var h='<div class="card"><h2>📋 Asistencia completa · '+esc(a?nombreDe(a):id)+'</h2>'+
    '<button class="mini" style="background:#1f4e79" onclick="perfil(\''+esc(id)+'\')">👤 Volver al perfil</button></div>';
   h+='<div class="card"><h2>Por mes</h2>'+(D.meses.length?'<div style="overflow-x:auto"><table><tr><th>MES</th><th>TURNOS</th><th>PRESENTE</th><th>JUSTIF.</th><th>AUSENTE</th><th>%</th></tr>'+
@@ -235,7 +271,7 @@ function listaGrupo(){conFC(function(){
  if(el('lg').value)verGrupo();});}
 function verGrupo(){var g=el('lg').value,t=el('lgT');if(!g){t.innerHTML='';return;}guardado('gaussCsaGrupo',g);
  t.innerHTML='<div class="card">Cargando…</div>';
- pedir('grupo',{grupo:g},function(D){var n={r:0,y:0,g:0};D.filas.forEach(function(x){if(x.sem==='🔴')n.r++;else if(x.sem==='🟡')n.y++;else if(x.sem==='🟢')n.g++;});
+ rapido('grupo',{grupo:g},'csaGrupo',g,function(D){var n={r:0,y:0,g:0};D.filas.forEach(function(x){if(x.sem==='🔴')n.r++;else if(x.sem==='🟡')n.y++;else if(x.sem==='🟢')n.g++;});
   t.innerHTML='<div class="card"><h2>'+esc(g)+' · '+D.filas.length+' alumnos</h2><div class="sub">🔴 '+n.r+' · 🟡 '+n.y+' · 🟢 '+n.g+' — tocá un alumno para ver su perfil</div>'+
   '<div style="overflow-x:auto;margin-top:8px"><table><tr><th></th><th>ALUMNO</th><th>ASIST.</th><th>30 DÍAS</th><th>FALTAS SEM.</th><th>PROM.</th><th>DEUDA</th></tr>'+
   D.filas.map(function(x){var sal=/sali/i.test(x.estado);
