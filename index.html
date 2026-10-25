@@ -133,7 +133,8 @@ function pedirPin(m){el('volver').style.display='none';msg('');
 function entrar(){PIN=el('pin').value.trim();guardado('gaussPinCSA',PIN);cargar();}
 
 function cargar(){el('app').innerHTML='';msg('Cargando alumnos…');
- function listo(){inicio();pedir('formCSA',{},function(d){FC=d;},function(){});}
+ function listo(){inicio();var pl=function(){pedir('formCSA',{},function(d){FC=d;},function(){});};
+  sbLeer('csaForm','todo',function(d){if(d.hoy){var x=new Date();d.hoy=new Date(x.getTime()-x.getTimezoneOffset()*60000).toISOString().slice(0,10);}FC=d;pl();},pl);}
  sbLeer('csaLista','todo',function(l){LISTA=l;listo();
    pedir('lista',{},function(l2){LISTA=l2;},function(e){if(String(e.message||'').indexOf('PIN:')>=0)falla(e);});},
   function(){pedir('lista',{},function(l){LISTA=l;listo();},function(e){falla(e);});});}
@@ -294,7 +295,8 @@ function pdfNotas(){var seguir=function(){
   '<button class="btn" id="nB" onclick="nGenerar()">🖨️ Generar PDF</button><div id="nR" style="margin-top:10px"></div></div>');
  var g=guardado('gaussCsaNotas').split('|');if(g[0]&&PN[g[0]])el('nP').value=g[0];nGrupos();if(g[1]&&el('nG').options[g[1]])el('nG').value=g[1];nExs();};
  if(PN)seguir();else{msg('Cargando planillas de notas… (puede tardar unos segundos)');
-  pedir('notasDatos',{},function(d){PN=d;msg('');seguir();},function(e){falla(e);});}}
+  var pl=function(){pedir('notasDatos',{},function(d){PN=d;msg('');seguir();},function(e){falla(e);});};
+  sbLeer('csaNotas','todo',function(d){PN=d;msg('');seguir();pedir('notasDatos',{},function(d2){PN=d2;},function(){});},pl);}}
 function nGrupos(){var p=PN[el('nP').value];el('nG').innerHTML=p.grupos.map(function(g,i){return '<option value="'+i+'">'+esc(g.nombre)+(g.ex.length?'':' (sin notas)')+'</option>';}).join('');nExs();}
 function nExs(){var g=PN[el('nP').value].grupos[el('nG').value],todos=el('nM').value==='todos';el('nR').innerHTML='';
  el('nEw').style.display=todos?'none':'block';
@@ -431,7 +433,7 @@ function csTabla(tit,enc,filas,der){der=der||[];return '<div class="card"><h2>'+
 function csK(t,v){return '<div class="cs-k"><span>'+esc(t)+'</span><b>'+v+'</b></div>';}
 function csMil(n){return Math.round(Number(n)||0).toLocaleString('es-PY');}
 
-function CS_PEDIR(a,p,ok,mal){pedir(a,p,ok,mal);}
+function CS_PEDIR(a,p,ok,mal){if(p.desde||p.hasta){NAV++;sbMarca('');pedir(a,p,ok,mal);return;}rapido(a,p,'csaCargas',p.anterior==='1'?'anterior':'actual',ok,mal);}
 function csPintar(R){var al=function(x){return x.id&&alumno(x.id)?'<span class="cs-al" onclick="perfil(\''+esc(x.id)+'\')">'+esc(x.alumno)+'</span>':esc(x.alumno);};
  var h='<div class="card"><h2>Del '+esc(R.desde)+' al '+esc(R.hasta)+'</h2><div class="cs-res">'+
   csK('Observaciones',R.obs.length)+csK('Contactos',R.contactos.length)+csK('Justificativos',R.justif.length)+csK('Informes padres',R.informes.length)+'</div>'+
