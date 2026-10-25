@@ -56,8 +56,9 @@ td{padding:5px;border-bottom:1px solid #eee;vertical-align:top}
 tr.clic{cursor:pointer}tr.clic:hover td{background:#e8f0fe}
 .wa{display:inline-block;background:#25d366;color:#fff;text-decoration:none;padding:7px 12px;border-radius:18px;margin:6px 6px 0 0;font-weight:bold;font-size:13px}
 .vacio{color:#999;font-style:italic}
+header h1 span.tit{color:inherit}h1 .tit{cursor:pointer;-webkit-tap-highlight-color:transparent}h1 .tit:active{opacity:.6}
 </style></head><body>
-<header><h1>🎓 Panel CSA <span>Gauss</span></h1><button id="volver" onclick="inicio()">⬅ Inicio</button></header>
+<header><h1><span class="tit" onclick="if(LISTA&&LISTA.length)inicio()" title="Ir al inicio">🎓 Panel CSA <span>Gauss</span></span></h1><button id="volver" onclick="inicio()">⬅ Inicio</button></header>
 <main><div id="app"></div><div id="msg">Cargando…</div></main>
 <script>
 // ===== Links de las dos aplicaciones web =====
@@ -104,7 +105,7 @@ function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'
 function sa(s){return String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');}
 function gs(n){n=Number(n)||0;return 'Gs. '+Math.round(n).toLocaleString('es-PY');}
 function num(s){return Number(String(s).replace(/[^0-9]/g,''))||0;}
-function fmt(i){var n=num(i.value);i.value=n?n.toLocaleString('es-PY'):'';}
+function fmt(i){var n=num(i.value);i.value=n?n.toLocaleString('es-PY'):(/0/.test(i.value)?'0':'');}   // se puede escribir 0
 function fecha(iso){if(!iso)return '';var p=iso.split('-');return p[2]+'/'+p[1]+'/'+p[0];}
 function hoyIso(){var d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);}
 function guardado(k,v){try{if(v===undefined)return localStorage.getItem(k)||'';localStorage.setItem(k,v);}catch(e){return '';}}
@@ -214,7 +215,7 @@ function pintarPerfil(D){var a=D.a,id=a['ID'];msg('');
   k('Total',a['% ASIST. TOTAL'],pct(a['% ASIST. TOTAL']))+k('Últimos 7 días',a['% ÚLTIMOS 7 DÍAS'],pct(a['% ÚLTIMOS 7 DÍAS']))+
   k('Últimos 15 días',a['% ÚLTIMOS 15 DÍAS'],pct(a['% ÚLTIMOS 15 DÍAS']))+k('Últimos 30 días',a['% ÚLTIMOS 30 DÍAS'],pct(a['% ÚLTIMOS 30 DÍAS']))+
   k('Faltas esta semana',a['FALTAS ESTA SEMANA'])+k('Tardes (30 días)',a['TARDES 30 DÍAS'])+k('Retiros (30 días)',a['RETIROS 30 DÍAS'])+
-  k('Última ausencia',a['ÚLTIMA AUSENCIA'])+'</div>'+
+  k('Última vez que vino',a['ÚLTIMA VEZ QUE VINO'])+k('Última ausencia',a['ÚLTIMA AUSENCIA'])+'</div>'+
   '<div class="sub" style="margin-top:8px;font-size:13px">Turnos: '+esc(a['TURNOS'])+' · Presente '+esc(a['PRESENTE'])+' · Tarde '+esc(a['LLEGÓ TARDE'])+
   ' · Se retiró '+esc(a['SE RETIRÓ'])+' · Justificado '+esc(a['JUSTIFICADO'])+' · Ausente '+esc(a['AUSENTE'])+'</div></div>';
  var deu=parseFloat(a['DEUDA'])||0;
@@ -272,17 +273,30 @@ function listaGrupo(){conFC(function(){
  if(el('lg').value)verGrupo();});}
 function verGrupo(){var g=el('lg').value,t=el('lgT');if(!g){t.innerHTML='';return;}guardado('gaussCsaGrupo',g);
  t.innerHTML='<div class="card">Cargando…</div>';
- rapido('grupo',{grupo:g},'csaGrupo',g,function(D){var n={r:0,y:0,g:0};D.filas.forEach(function(x){if(x.sem==='🔴')n.r++;else if(x.sem==='🟡')n.y++;else if(x.sem==='🟢')n.g++;});
-  t.innerHTML='<div class="card"><h2>'+esc(g)+' · '+D.filas.length+' alumnos</h2><div class="sub">🔴 '+n.r+' · 🟡 '+n.y+' · 🟢 '+n.g+' — tocá un alumno para ver su perfil</div>'+
-  '<div style="overflow-x:auto;margin-top:8px"><table><tr><th></th><th>ALUMNO</th><th>ASIST.</th><th>30 DÍAS</th><th>FALTAS SEM.</th><th>PROM.</th><th>DEUDA</th></tr>'+
-  D.filas.map(function(x){var sal=/sali/i.test(x.estado);
+ rapido('grupo',{grupo:g},'csaGrupo',g,function(D){GRP_D=D;GRP_G=g;pintarGrupoCSA();},function(e){falla(e,'lgT');});}
+// orden del resumen de grupo: por defecto por apellido; los que salieron siempre al final
+var GRP_D=null,GRP_G='',GRP_ORD=guardado('gaussCsaGrpOrd')||'apellido';
+var GRP_OPC=[['apellido','Apellido'],['sem','Semáforo'],['asis','Asistencia'],['deuda','Deuda'],['faltas','Faltas semana'],['prom','Prom. exámenes']];
+function ordGrupo(o){GRP_ORD=o;guardado('gaussCsaGrpOrd',o);pintarGrupoCSA();}
+function pintarGrupoCSA(){var D=GRP_D,g=GRP_G,t=el('lgT');if(!D||!t)return;var n={r:0,y:0,g:0};
+ D.filas.forEach(function(x){if(x.sem==='🔴')n.r++;else if(x.sem==='🟡')n.y++;else if(x.sem==='🟢')n.g++;});
+ var num=function(v,vac){return v===''||v===null||v===undefined||isNaN(Number(v))?vac:Number(v);},sem={'🔴':0,'🟡':1,'🟢':2};
+ var cmp={apellido:function(){return 0;},sem:function(a,b){return (sem[a.sem]===undefined?3:sem[a.sem])-(sem[b.sem]===undefined?3:sem[b.sem]);},
+  asis:function(a,b){return num(a.d15,999)-num(b.d15,999)||num(a.d30,999)-num(b.d30,999);},deuda:function(a,b){return (b.deuda||0)-(a.deuda||0);},
+  faltas:function(a,b){return num(b.faltas,0)-num(a.faltas,0);},prom:function(a,b){return num(a.prom,999)-num(b.prom,999);}}[GRP_ORD]||function(){return 0;};
+ var filas=D.filas.slice().sort(function(a,b){var sa=/sali/i.test(a.estado)?1:0,sb=/sali/i.test(b.estado)?1:0;return sa-sb||cmp(a,b)||a.nombre.localeCompare(b.nombre,'es');});
+ var pc=function(v){return v===''||v===undefined||v===null?'–':v+'%';};
+ t.innerHTML='<div class="card"><h2>'+esc(g)+' · '+D.filas.length+' alumnos</h2><div class="sub">🔴 '+n.r+' · 🟡 '+n.y+' · 🟢 '+n.g+' — tocá un alumno para ver su perfil</div>'+
+  '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span class="ayuda">Ordenar por:</span>'+GRP_OPC.map(function(o){
+   return '<button class="mini" style="'+(GRP_ORD===o[0]?'background:#1f4e79;color:#fff':'background:#e8eef6;color:#1f4e79')+'" onclick="ordGrupo(\''+o[0]+'\')">'+o[1]+'</button>';}).join('')+'</div>'+
+  '<div style="overflow-x:auto;margin-top:8px"><table><tr><th></th><th>ALUMNO</th><th>15 DÍAS</th><th>30 DÍAS</th><th>FALTAS SEMANA</th><th>PROM. EXÁMENES</th><th>DEUDA</th></tr>'+
+  filas.map(function(x){var sal=/sali/i.test(x.estado);
    return '<tr class="clic'+(sal?' gris':'')+'" onclick="perfil(\''+esc(x.id)+'\')" title="'+esc(x.motivos)+'"><td>'+esc(x.sem)+'</td><td><b>'+esc(x.nombre)+'</b>'+(sal?' <small>(salió)</small>':'')+
     (x.motivos?'<br><small style="color:#777">'+esc(x.motivos)+'</small>':'')+'</td>'+
-    '<td class="'+pct(x.total)+'">'+(x.total===''?'–':x.total+'%')+'</td><td class="'+pct(x.d30)+'">'+(x.d30===''?'–':x.d30+'%')+'</td>'+
+    '<td class="'+pct(x.d15)+'">'+pc(x.d15)+'</td><td class="'+pct(x.d30)+'">'+pc(x.d30)+'</td>'+
     '<td class="'+(Number(x.faltas)>0?'r':'')+'">'+esc(x.faltas||0)+'</td>'+
     '<td class="'+(x.prom===''?'':(x.prom<D.notaBaja?'r':(x.prom<D.notaMedia?'y':'g')))+'">'+(x.prom===''?'–':x.prom)+'</td>'+
-    '<td class="'+(x.deuda>0?'r':'')+'">'+(x.deuda>0?gs(x.deuda):'–')+'</td></tr>';}).join('')+'</table></div></div>';},
-  function(e){falla(e,'lgT');});}
+    '<td class="'+(x.deuda>0?'r':'')+'">'+(x.deuda>0?gs(x.deuda):'–')+'</td></tr>';}).join('')+'</table></div></div>';}
 
 // ---------- 🖨️ PDF DE NOTAS ----------
 var PN=null;
@@ -385,34 +399,37 @@ function cambiarGrupo(id){conFI(function(){abrir('¿Qué alumno cambia de grupo?
   '<div class="ayuda">Ahora está en: <b>'+esc(a[2]||'—')+'</b></div>'+
   '<label>Pasa a <span class="req">*</span></label><select id="cgG"><option value=""></option>'+
   Object.keys(mods).map(function(m){return '<optgroup label="'+esc(m)+'">'+mods[m].map(function(g){return '<option value="'+esc(g.cod)+'">'+esc(g.nombre)+'</option>';}).join('')+'</optgroup>';}).join('')+'</select>'+
-  '<div class="fila2"><div><label>Desde el día <span class="req">*</span></label><input type="date" id="cgF" value="'+hoyIso()+'"></div>'+
-  '<div><label>Cuota nueva (Gs.) <span class="ayuda">(vacío = la misma)</span></label><input id="cgC" inputmode="numeric" oninput="fmt(this)"></div></div>'+
-  '<div class="ayuda" style="margin-top:8px">Se cierra la inscripción de antes ese día y se crea la nueva. En el CSA se ve en la próxima actualización.</div>'+
+  '<label>Desde el día <span class="req">*</span></label><input type="date" id="cgF" value="'+hoyIso()+'">'+
+  '<div class="ayuda" style="margin-top:8px">Se cierra la inscripción de antes ese día y se crea la nueva. La cuota la revisa secretaría (le llega un aviso). En el CSA se ve en la próxima actualización.</div>'+
   '<button class="btn" id="cgB" onclick="guardarCambio()">🔄 Cambiar de grupo</button><div id="cgM"></div></div>';},id);});}
 function guardarCambio(){var a=PICK,g=el('cgG').value,m=el('cgM');
  if(!g){m.innerHTML='<div class="err">Elegí el grupo nuevo.</div>';return;}
  if(!el('cgF').value){m.innerHTML='<div class="err">Elegí la fecha.</div>';return;}
  var gn=FI.grupos.filter(function(x){return x.cod===g;})[0];
- if(!confirm('¿Pasar a '+nombreDe(a)+'\nde '+(a[2]||'?')+' a '+gn.nombre+'\ndesde el '+fecha(el('cgF').value)+(num(el('cgC').value)?'\ncon cuota de '+gs(num(el('cgC').value)):'')+'?'))return;
+ if(!confirm('¿Pasar a '+nombreDe(a)+'\nde '+(a[2]||'?')+' a '+gn.nombre+'\ndesde el '+fecha(el('cgF').value)+'?'))return;
  var b=el('cgB');b.disabled=true;b.textContent='Guardando…';ACTUAL=a;
- pedirAdm('cambioGrupo',{id:a[1],grupo:g,fecha:el('cgF').value,cuota:num(el('cgC').value)||''},function(r){a[2]=r.grupo;
+ pedirAdm('cambioGrupo',{id:a[1],grupo:g,fecha:el('cgF').value,quien:quienSoy()},function(r){a[2]=r.grupo;
    hecho(esc(r.nombre)+' pasó a '+esc(r.grupo)+'.<br><span style="font-weight:normal;font-size:15px">Sumalo al grupo de WhatsApp nuevo.</span>',otroBoton('🔄 Cambiar a otro alumno','cambiarGrupo'));},
   function(e){b.disabled=false;b.textContent='🔄 Cambiar de grupo';falla(e,'cgM');});}
 
 // ---------- 🚪 SALIÓ DEL GRUPO (lo guarda Administración) ----------
 function baja(id){var seguir=function(){abrir('¿Qué alumno salió?','bj',function(a){
  el('bj').innerHTML='<div class="card"><h2><span class="paso">2</span>Salió del grupo</h2>'+
-  '<label>Último día que vino <span class="req">*</span></label><input type="date" id="bF" value="'+FB.hoy+'">'+
-  '<div class="ayuda">Desde ese día ya no se le generan cuotas nuevas. Si tiene deuda, queda registrada.</div>'+
+  '<label>¿Cuándo avisó que ya no viene? <span class="req">*</span></label><input type="date" id="bA" value="'+FB.hoy+'">'+
+  '<label>Último día que vino <span class="req">*</span> <span class="ayuda" id="bUv">(buscando en las listas…)</span></label><input type="date" id="bF">'+
+  '<div class="ayuda">Sale solo de las listas (la última vez que tuvo presente); se puede cambiar. Las cuotas las revisa secretaría (le llega un aviso).</div>'+
   '<label>Motivo</label>'+(FB.motivos.length?'<select id="bM">'+op(FB.motivos)+'</select>':'<input id="bM">')+
   '<label>Observación <span class="ayuda">(opcional)</span></label><input id="bO">'+
-  '<button class="btn" id="bB" onclick="guardarBaja()">🚪 Confirmar salida</button><div id="bMsg"></div></div>';},id);};
+  '<button class="btn" id="bB" onclick="guardarBaja()">🚪 Confirmar salida</button><div id="bMsg"></div></div>';
+ pedirAdm('bajaPrevia',{id:a[1]},function(r){if(!el('bF'))return;if(r.ultimaVez&&!el('bF').value)el('bF').value=r.ultimaVez;el('bUv').textContent=r.ultimaVez?'(según las listas: '+r.ultimaVezTxt+')':'(no aparece en las listas: escribila)';},
+  function(){if(el('bUv'))el('bUv').textContent='';});},id);};
  if(FB)seguir();else{msg('Cargando…');pedirAdm('formBaja',{},function(d){FB=d;msg('');seguir();},function(e){falla(e);});}}
 function guardarBaja(){var a=PICK,m=el('bMsg');
- if(!el('bF').value){m.innerHTML='<div class="err">Falta la fecha.</div>';return;}
- if(!confirm('¿Registrar que '+nombreDe(a)+' ('+(a[2]||'')+')\nsalió el '+fecha(el('bF').value)+'?'))return;
+ if(!el('bA').value){m.innerHTML='<div class="err">Falta cuándo avisó.</div>';return;}
+ if(!el('bF').value){m.innerHTML='<div class="err">Falta el último día que vino.</div>';return;}
+ if(!confirm('¿Registrar que '+nombreDe(a)+' ('+(a[2]||'')+') salió?\n\nAvisó el '+fecha(el('bA').value)+'\nVino por última vez el '+fecha(el('bF').value)))return;
  var b=el('bB');b.disabled=true;b.textContent='Guardando…';ACTUAL=a;
- pedirAdm('baja',{id:a[1],fecha:el('bF').value,motivo:el('bM').value,obs:el('bO').value},function(r){a[3]='Salió';
+ pedirAdm('baja',{id:a[1],fecha:el('bF').value,ultima:el('bF').value,aviso:el('bA').value,motivo:el('bM').value,obs:el('bO').value,quien:quienSoy()},function(r){a[3]='Salió';
    hecho(esc(r.nombre)+' salió de '+esc(r.grupo)+' desde el '+esc(r.fecha)+'.<br><span style="font-weight:normal;font-size:15px">Acordate de sacarlo del grupo de WhatsApp.</span>',otroBoton('🚪 Registrar otra salida','baja'));},
   function(e){b.disabled=false;b.textContent='🚪 Confirmar salida';falla(e,'bMsg');});}
 
@@ -422,7 +439,12 @@ function cargasSemana(){pantalla('<div class="card"><h2>📒 Cargas de la semana
   '<button id="cs0" onclick="csIr(\'0\')">Esta semana</button><button id="cs1" onclick="csIr(\'1\')">Semana anterior</button><button id="csX" onclick="csIr(\'x\')">Elegir fechas</button></div>'+
   '<div id="csF" style="display:none;margin-top:8px"><div class="fila'+'2'+'"><div><label>Desde</label><input type="date" id="csD"></div><div><label>Hasta</label><input type="date" id="csH"></div></div>'+
   '<button class="btn" style="margin-top:10px" onclick="csVer({desde:el(\'csD\').value,hasta:el(\'csH\').value})">Ver</button></div>'+
-  '<div class="ayuda" style="margin-top:6px">La semana va de sábado a viernes.</div></div><div id="csR"></div>');csIr(CS_MODO==='x'?'0':CS_MODO);}
+  '<div class="ayuda" style="margin-top:6px">La semana va de sábado a viernes. <button class="mini" id="csOrd" onclick="csCambiarOrden()" style="margin-left:6px">'+csOrdTxt()+'</button></div></div><div id="csR"></div>');csIr(CS_MODO==='x'?'0':CS_MODO);}
+// orden de las cargas: por defecto lo último cargado arriba (el servidor manda de más viejo a más nuevo)
+var CS_ORDEN=guardado('gaussCsOrden')||'nuevo',CS_ULT=null;
+function csOrdTxt(){return CS_ORDEN==='nuevo'?'↓ Más nuevos primero':'↑ Más viejos primero';}
+function csCambiarOrden(){CS_ORDEN=CS_ORDEN==='nuevo'?'viejo':'nuevo';guardado('gaussCsOrden',CS_ORDEN);var b=el('csOrd');if(b)b.textContent=csOrdTxt();if(CS_ULT&&el('csR'))el('csR').innerHTML=csPintar(CS_ULT);}
+function csOrdenar(R){var X={};Object.keys(R).forEach(function(k){X[k]=Array.isArray(R[k])&&k!=='medios'&&CS_ORDEN==='nuevo'?R[k].slice().reverse():R[k];});return X;}
 function csIr(m){CS_MODO=m;['0','1','X'].forEach(function(k){var b=el('cs'+k);if(b)b.className=(k===m||(k==='X'&&m==='x'))?'on':'';});
  el('csF').style.display=m==='x'?'block':'none';if(m!=='x')csVer({anterior:m});}
 function csVer(p){el('csR').innerHTML='<div class="card">Cargando… (unos segundos)</div>';
@@ -434,7 +456,7 @@ function csK(t,v){return '<div class="cs-k"><span>'+esc(t)+'</span><b>'+v+'</b><
 function csMil(n){return Math.round(Number(n)||0).toLocaleString('es-PY');}
 
 function CS_PEDIR(a,p,ok,mal){if(p.desde||p.hasta){NAV++;sbMarca('');pedir(a,p,ok,mal);return;}rapido(a,p,'csaCargas',p.anterior==='1'?'anterior':'actual',ok,mal);}
-function csPintar(R){var al=function(x){return x.id&&alumno(x.id)?'<span class="cs-al" onclick="perfil(\''+esc(x.id)+'\')">'+esc(x.alumno)+'</span>':esc(x.alumno);};
+function csPintar(R){CS_ULT=R;R=csOrdenar(R);var al=function(x){return x.id&&alumno(x.id)?'<span class="cs-al" onclick="perfil(\''+esc(x.id)+'\')">'+esc(x.alumno)+'</span>':esc(x.alumno);};
  var h='<div class="card"><h2>Del '+esc(R.desde)+' al '+esc(R.hasta)+'</h2><div class="cs-res">'+
   csK('Observaciones',R.obs.length)+csK('Contactos',R.contactos.length)+csK('Justificativos',R.justif.length)+csK('Informes padres',R.informes.length)+'</div>'+
   '<div class="ayuda" style="margin-top:8px">Tocá un nombre para abrir su perfil.</div></div>';
