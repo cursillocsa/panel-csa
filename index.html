@@ -180,7 +180,7 @@ function cargarCal(){var pon=function(d){CAL=d;pintarAvisos();};
  sbLeer('csaCal','todo',function(d){pon(d);pedir('calendario',{},pon,function(){});},function(){pedir('calendario',{},pon,function(){});});}
 // Avisos en el inicio: hoy y los próximos 6 días
 function pintarAvisos(){var b=el('avisosCal');if(!b||!CAL)return;var h=CAL.hoy,fin=isoMas(h,6);
- var l=CAL.items.filter(function(x){return x.iso>=h&&x.iso<=fin;});
+ var l=CAL.items.filter(function(x){return x.iso>=h&&x.iso<=fin&&(x.tipo!=='Sin clase'||x.grupos.indexOf('Todos')>=0);});
  if(!l.length){b.innerHTML='';return;}
  b.innerHTML='<div class="card" style="border-left:6px solid #1565c0;cursor:pointer" onclick="calendario()"><b>📅 Próximos días</b>'+
   l.slice(0,6).map(function(x){var t=CAL_TIPO[x.tipo]||CAL_TIPO.Otro;
