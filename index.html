@@ -324,7 +324,7 @@ function formExa(i,cerrar){var x=EXA_V[i],d=el('ex'+i+'f');if(!x||!d)return;
 function marcarExa(i,accion){var x=EXA_V[i],m=el('exM'+i);if(!x)return;var nota=val('exN'+i).trim(),quien=val('exY'+i);
  if(accion==='contactado'&&!nota){m.innerHTML='<div class="err">Escribí qué te dijeron (una nota corta).</div>';return;}
  if(quien)guardado('gaussCsaYo',quien);m.innerHTML='<div class="ayuda">Guardando…</div>';
- pedir('examenMarcar',{clave:x.clave,accion:accion,aquien:val('exQ'+i),nota:nota,quien:quien,alumno:x.alumno,grupo:x.grupo,examen:(x.materia||'examen')+' del '+x.diaTxt},function(){
+ pedir('examenMarcar',{clave:x.clave,que:accion,aquien:val('exQ'+i),nota:nota,quien:quien,alumno:x.alumno,grupo:x.grupo,examen:(x.materia||'examen')+' del '+x.diaTxt},function(){
   if(accion!=='norespondio')EXA.alertas=EXA.alertas.filter(function(a){return a.clave!==x.clave;});
   else{x.intentado=true;x.atrasada=false;x.nota=(x.nota?x.nota+' · ':'')+'📵 No respondió ('+(quien||'CSA')+')';}
   var y=window.scrollY;pintarExa();window.scrollTo(0,y);},function(e){falla(e,'exM'+i);});}
@@ -504,7 +504,7 @@ function formVolvio(i){var x=ALR_VISTA[i],d=el('al'+i+'f');if(!x||!d)return;
   '<div style="display:flex;align-items:flex-end"><button class="btn" style="width:auto;padding:10px 16px;background:#2e7d32" onclick="marcarVolvio('+i+')">✅ Cerrar alerta</button></div></div><div id="avM'+i+'"></div></div>';});}
 function marcarVolvio(i){var x=ALR_VISTA[i],m=el('avM'+i);if(!x)return;var quien=val('avY'+i);if(quien)guardado('gaussCsaYo',quien);
  m.innerHTML='<div class="ayuda">Guardando…</div>';
- pedir('alertaMarcar',{clave:x.clave,accion:'volvio',quien:quien},function(){
+ pedir('alertaMarcar',{clave:x.clave,que:'volvio',quien:quien},function(){
   ALR.alertas=ALR.alertas.filter(function(a){return a.clave!==x.clave;});var b=el('bAlr');if(b)b.innerHTML=txtBotonAlr();
   var y=window.scrollY;pintarAlertas();window.scrollTo(0,y);},function(e){falla(e,'avM'+i);});}
 function val(id){var e=el(id);return e?e.value:"";}
@@ -519,7 +519,7 @@ function marcarAlerta(i,accion){var x=ALR_VISTA[i],m=el('afM'+i);if(!x)return;va
  if(accion==='contactado'&&!nota){m.innerHTML='<div class="err">Escribí qué te dijeron (una nota corta).</div>';return;}
  if(quien)guardado('gaussCsaYo',quien);
  m.innerHTML='<div class="ayuda">Guardando…</div>';
- pedir('alertaMarcar',{clave:x.clave,accion:accion,aquien:val('afQ'+i),nota:nota,quien:quien},function(){
+ pedir('alertaMarcar',{clave:x.clave,que:accion,aquien:val('afQ'+i),nota:nota,quien:quien},function(){
   if(accion==='contactado')ALR.alertas=ALR.alertas.filter(function(a){return a.clave!==x.clave;});
   else{x.intentado=true;x.atrasada=false;x.nota=(x.nota?x.nota+' · ':'')+'📵 No respondió ('+(quien||'CSA')+')';}
   var y=window.scrollY;pintarAlertas();window.scrollTo(0,y);},function(e){falla(e,'afM'+i);});}
