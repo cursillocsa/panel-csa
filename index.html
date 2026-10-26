@@ -255,49 +255,91 @@ function informe(id){var b=el('bInf'),r=el('resInf');b.disabled=true;b.textConte
   function(e){b.disabled=false;b.textContent='📄 Generar PDF';falla(e,'resInf');});}
 
 // ---------- 🚨 ALERTAS DE ASISTENCIA ----------
-var ALR=null,ALR_T=guardado('gaussAlrTipo')||'todas',ALR_G='',ALR_MIS=guardado('gaussAlrMis')==='1';
+var ALR=null,ALR_T=guardado('gaussAlrTipo')||'todas',ALR_G='',ALR_D='',ALR_H='';
+// fecha de la alerta (dd/mm) → aaaa-mm-dd (si el mes es posterior al de hoy, es del año anterior)
+function alrIso(x){var hoy=(ALR&&ALR.hoy)||hoyIso(),p=String(x.fecha||'').split('/');if(p.length<2)return '';var y=Number(hoy.slice(0,4));
+ if(Number(p[1])>Number(hoy.slice(5,7)))y--;return y+'-'+('0'+p[1]).slice(-2)+'-'+('0'+p[0]).slice(-2);}
+function isoMenos(iso,n){var q=iso.split('-').map(Number),d=new Date(Date.UTC(q[0],q[1]-1,q[2]-n));return d.toISOString().slice(0,10);}
+function alrRango(){var hoy=(ALR&&ALR.hoy)||hoyIso();return [ALR_D||isoMenos(hoy,7),ALR_H||hoy];}
+function alrEnRango(x){var r=alrRango(),i=alrIso(x);return !i||(i>=r[0]&&i<=r[1]);}
 function cargarAlertas(){var pon=function(d){ALR=d;var b=el('bAlr');if(b)b.innerHTML=txtBotonAlr();};
  sbLeer('csaAlertas','todo',function(d){pon(d);pedir('alertas',{},pon,function(){});},function(){pedir('alertas',{},pon,function(){});});}
-function txtBotonAlr(){var n=ALR?ALR.alertas.length:null,a=ALR?ALR.alertas.filter(function(x){return x.atrasada;}).length:0;
+function txtBotonAlr(){var l7=ALR?ALR.alertas.filter(alrEnRango):[],n=ALR?l7.length:null,a=l7.filter(function(x){return x.atrasada;}).length;
  return '🚨 Alertas de asistencia'+(n===null?'':' <span style="background:#fff;color:#c0392b;border-radius:12px;padding:1px 9px;font-size:15px">'+n+'</span>')+
-  '<small>Faltas seguidas y asistencia baja · contactar y marcar'+(a?' · ⚠️ '+a+' atrasada'+(a>1?'s':''):'')+'</small>';}
+  '<small>Últimos 7 días · faltas seguidas y asistencia baja'+(a?' · ⚠️ '+a+' atrasada'+(a>1?'s':''):'')+'</small>';}
 function alertas(){pantalla('<div class="card">Cargando alertas…</div>');
  rapido('alertas',{},'csaAlertas','todo',function(d){ALR=d;pintarAlertas();},function(e){falla(e);});}
-function esMio(x){var yo=sa(quienSoy()||'');if(!yo)return true;var en=sa(x.enc||'');return !!en&&(en.indexOf(yo)>=0||yo.indexOf(en)>=0);}
-function pintarAlertas(){if(!ALR)return;var L0=ALR.alertas,yo=quienSoy();
+function pintarAlertas(){if(!ALR)return;var L0=ALR.alertas.filter(alrEnRango),R=alrRango();
  var ord={'Faltas seguidas':0,'Asistencia baja':1,'No inscripto':2};
- var base=L0.filter(function(x){return (!ALR_MIS||esMio(x));});
+ var base=L0;
  var l=base.filter(function(x){return (ALR_T==='todas'||x.tipo===ALR_T)&&(!ALR_G||x.grupo===ALR_G);})
-  .sort(function(a,b){return (ord[a.tipo]===undefined?3:ord[a.tipo])-(ord[b.tipo]===undefined?3:ord[b.tipo])||b.n-a.n||(a.pct===null?999:a.pct)-(b.pct===null?999:b.pct)||a.alumno.localeCompare(b.alumno,'es');});
+  .sort(function(a,b){return (ord[a.tipo]===undefined?3:ord[a.tipo])-(ord[b.tipo]===undefined?3:ord[b.tipo])||(a.volvio?1:0)-(b.volvio?1:0)||b.n-a.n||(a.pct===null?999:a.pct)-(b.pct===null?999:b.pct)||a.alumno.localeCompare(b.alumno,'es');});
  // resumen por encargado
  var porEnc={};L0.forEach(function(x){var k=x.enc||'Sin encargado',e=porEnc[k]||(porEnc[k]={p:0,a:0});e.p++;if(x.atrasada)e.a++;});
  var grupos={};base.forEach(function(x){grupos[x.grupo]=1;});
  var tipos=[['todas','Todas'],['Faltas seguidas','Faltas seguidas'],['Asistencia baja','Asistencia baja'],['No inscripto','No inscripto']];
  var chip=function(v,t,on,fn){return '<button class="mini" style="'+(on?'background:#c0392b;color:#fff':'background:#f4cccc;color:#990000')+'" onclick="'+fn+'">'+t+'</button>';};
  var h='<div class="card"><h2>🚨 Alertas de asistencia · '+L0.length+' pendientes</h2>'+
-  '<div class="ayuda">Del que más falta al que menos. "✔ Ya nos contactamos" la saca de la lista y queda en REGISTRO DE CONTACTOS. Sin atender en '+(ALR.horas||48)+' h = ⚠️ atrasada.</div>'+
+  '<div class="fila2"><div><label>Desde</label><input type="date" value="'+R[0]+'" onchange="ALR_D=this.value;pintarAlertas()"></div>'+
+  '<div><label>Hasta</label><input type="date" value="'+R[1]+'" onchange="ALR_H=this.value;pintarAlertas()"></div></div>'+
+  '<div class="ayuda" style="margin-top:6px">Por defecto, los últimos 7 días (según la fecha de la alerta). <b>Pendiente</b> = todavía nadie marcó "Ya nos contactamos". '+
+  '<b>Atrasada</b> = pendiente que lleva más de '+(ALR.horas||48)+' h sin que nadie intente contactar.</div>'+
   '<div style="overflow-x:auto;margin-top:8px"><table><tr><th>ENCARGADO</th><th>PENDIENTES</th><th>ATRASADAS</th></tr>'+
   Object.keys(porEnc).sort(function(a,b){return porEnc[b].p-porEnc[a].p;}).map(function(k){return '<tr><td>'+esc(k)+'</td><td>'+porEnc[k].p+'</td><td class="'+(porEnc[k].a?'r':'')+'">'+(porEnc[k].a||'–')+'</td></tr>';}).join('')+'</table></div>'+
   '<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">'+tipos.map(function(t){return chip(t[0],t[1],ALR_T===t[0],"ALR_T='"+t[0]+"';guardado('gaussAlrTipo',ALR_T);pintarAlertas()");}).join('')+'</div>'+
   '<div class="fila2" style="margin-top:8px"><div><select onchange="ALR_G=this.value;pintarAlertas()"><option value="">Todos los grupos</option>'+
   Object.keys(grupos).sort(function(a,b){return a.localeCompare(b,'es',{numeric:true});}).map(function(g){return '<option'+(g===ALR_G?' selected':'')+'>'+esc(g)+'</option>';}).join('')+'</select></div>'+
-  '<div><label style="font-weight:normal"><input type="checkbox" style="width:auto"'+(ALR_MIS?' checked':'')+' onchange="ALR_MIS=this.checked;guardado(\'gaussAlrMis\',ALR_MIS?\'1\':\'0\');pintarAlertas()"> Solo mis grupos'+(yo?' ('+esc(yo)+')':' <span class="ayuda">(elegí quién sos en Observación o Contacto)</span>')+'</label></div></div></div>';
- if(!l.length)h+='<div class="card"><div class="vacio">✓ No hay alertas'+(ALR_G||ALR_T!=='todas'||ALR_MIS?' con este filtro':'')+'.</div></div>';
- l.forEach(function(x,i){var k='al'+i;
-  h+='<div class="card'+(x.atrasada?' r':'')+'" id="'+k+'"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><div>'+
+  '<div></div></div></div>';
+ if(!l.length)h+='<div class="card"><div class="vacio">✓ No hay alertas con este filtro.</div></div>';
+ l.forEach(function(x,i){var k='al'+i,fs=x.tipo==='Faltas seguidas',ab=!!ALR_AB[x.clave];
+  var estado=fs?(x.volvio?'<span style="color:#1b8a3a;font-weight:bold">✅ Volvió el '+esc(x.volvio)+'</span>'
+     :(x.volvio===undefined?'':'<span style="color:#b71c1c;font-weight:bold">⏳ Todavía no volvió</span>'+(x.ultVino?' <span class="ayuda">· vino por última vez el '+esc(x.ultVino)+'</span>':'')))
+   :(x.ultVino?'<span class="ayuda">Última vez que vino: '+esc(x.ultVino)+'</span>':'');
+  h+='<div class="card'+(x.atrasada?' r':'')+'" id="'+k+'" style="'+(fs&&x.volvio?'opacity:.72;background:#f6fbf6':'')+'"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><div>'+
    '<b style="font-size:16px'+(x.id?';cursor:pointer;text-decoration:underline':'')+'"'+(x.id?' onclick="perfil(\''+esc(x.id)+'\')"':'')+'>'+esc(x.alumno)+'</b>'+
    '<div class="sub">'+esc(x.grupo)+(x.enc?' · encargado: '+esc(x.enc):'')+' · '+esc(x.fecha)+'</div></div>'+
    '<div><span class="badge" style="background:#c0392b;color:#fff;border-radius:10px;padding:3px 9px;font-size:12px">'+esc(x.tipo)+(x.n?' · '+x.n+' seguidas':(x.pct!==null?' · '+x.pct+'%':''))+'</span>'+
    (x.atrasada?' <span class="badge" style="background:#7f0000;color:#fff;border-radius:10px;padding:3px 9px;font-size:12px">⚠️ atrasada</span>':'')+'</div></div>'+
-   '<div style="margin-top:6px">'+esc(x.detalle)+'</div>'+
+   (estado?'<div style="margin-top:6px">'+estado+'</div>':'<div style="margin-top:6px">'+esc(x.detalle)+'</div>')+
    (x.nota?'<div class="ayuda" style="margin-top:4px">📝 '+esc(x.nota)+'</div>':'')+
-   '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">'+
-   (x.waAl?'<a class="wa" href="'+esc(x.waAl)+'" target="_blank">📲 Alumno</a>':'')+
-   (x.waRe?'<a class="wa" style="background:#128c7e" href="'+esc(x.waRe)+'" target="_blank">📲 Responsable'+(x.resp?' ('+esc(x.resp.split(' ')[0])+')':'')+'</a>':'')+
-   '<button class="mini" style="background:#1b8a3a;color:#fff;padding:8px 12px" onclick="formAlerta('+i+')">✔ Ya nos contactamos / 📵 No respondió</button></div>'+
+   '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+
+   (x.waAl?'<a class="wa" href="'+esc(x.waAl)+'" target="_blank">📲 Alumno</a>':(x.sinCel?'<span class="ayuda" title="Falta el celular del alumno">📵 sin cel. alumno</span>':''))+
+   (x.waRe?'<a class="wa" style="background:#128c7e" href="'+esc(x.waRe)+'" target="_blank">📲 Responsable'+(x.resp?' ('+esc(x.resp.split(' ')[0])+')':'')+'</a>':(x.sinCelR?'<span class="ayuda" title="Falta el celular del responsable">📵 sin cel. resp.</span>':''))+
+   '<button class="mini" style="background:#1b8a3a;color:#fff;padding:8px 12px" onclick="formAlerta('+i+')">✔ Contactamos / 📵 No respondió</button>'+
+   (fs?'<button class="mini" style="background:'+(x.volvio?'#2e7d32':'#888')+';color:#fff;padding:8px 12px" onclick="formVolvio('+i+')">✅ Volvió solo, cerrar</button>':'')+'</div>'+
+   '<div style="margin-top:8px"><a href="javascript:void 0" style="color:#1565c0;font-size:14px;text-decoration:none" onclick="verMasAlr('+i+')">'+(ab?'▾ Ver menos':'▸ Ver más')+'</a></div>'+
+   (ab?masAlr(x):'')+
    '<div id="'+k+'f"></div></div>';});
  el('app').innerHTML=h;ALR_VISTA=l;}
-var ALR_VISTA=[];
+var ALR_VISTA=[],ALR_AB={};
+function verMasAlr(i){var x=ALR_VISTA[i];if(!x)return;if(ALR_AB[x.clave])delete ALR_AB[x.clave];else ALR_AB[x.clave]=1;var y=window.scrollY;pintarAlertas();window.scrollTo(0,y);}
+// lo que se despliega con "▸ Ver más"
+function masAlr(x){var col={P:['#1b8a3a','vino'],T:['#e0a800','tarde/retiro'],J:['#1565c0','justificado'],A:['#c0392b','faltó']},fila=function(ic,tit,txt){return '<div style="margin-top:6px"><b>'+ic+' '+tit+':</b> '+txt+'</div>';};
+ var h='<div style="background:#f3f5f9;border-radius:8px;padding:10px;margin-top:6px;font-size:14px">';
+ if(x.faltoDias)h+=fila('📅','Faltó',esc(x.faltoDias));
+ else if(x.detalle)h+=fila('📅','Detalle',esc(x.detalle));
+ if(x.dias15&&x.dias15.length){
+  h+='<div style="margin-top:6px"><b>🗓️ Últimos 15 días'+(x.p15!==null&&x.p15!==undefined?' · '+x.p15+'% asistencia':'')+':</b></div><div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:4px">'+
+   x.dias15.map(function(d){var c=col[d.r]||col.A;return '<span title="'+c[1]+'" style="background:'+c[0]+';color:#fff;border-radius:6px;padding:2px 6px;font-size:12px">'+esc(d.d)+'</span>';}).join('')+'</div>'+
+   '<div class="ayuda" style="margin-top:3px">verde vino · amarillo tarde/retiro · azul justificado · rojo faltó</div>';}
+ else if(x.p15!==null&&x.p15!==undefined)h+=fila('🗓️','Asistencia 15 días',x.p15+'%');
+ if(x.obsProf)h+=fila('👩‍🏫','Lo último que anotó el profe',esc(x.obsProf));
+ if(x.jus&&x.jus.length)h+=fila('🩺','Justificativo',x.jus.map(esc).join('<br>'));
+ h+=fila('📞','Contactos anteriores',x.contAnt&&x.contAnt.length?x.contAnt.map(esc).join('<br>'):'<span class="ayuda">ninguno</span>');
+ if(x.nMes)h+='<div class="ayuda" style="margin-top:2px">'+(x.nMes>1?'<b style="color:#b71c1c">'+x.nMes+'.ª alerta de este mes</b>':'1.ª alerta de este mes')+'</div>';
+ if(x.examen!==''&&x.examen!==undefined||x.prom!==''&&x.prom!==undefined)h+=fila('📝','Último examen',(x.examen!==''&&x.examen!==undefined?esc(x.examen):'–')+' · promedio '+(x.prom!==''&&x.prom!==undefined?esc(x.prom):'–'));
+ if(x.dias15===undefined)h+='<div class="ayuda" style="margin-top:6px">Más datos aparecen con la próxima actualización.</div>';
+ return h+'</div>';}
+function formVolvio(i){var x=ALR_VISTA[i],d=el('al'+i+'f');if(!x||!d)return;
+ conFC(function(){d.innerHTML='<div style="background:#eef7ee;border-radius:8px;padding:10px;margin-top:8px">'+
+  '<div class="ayuda">Se cierra la alerta sin contactar porque el alumno ya volvió.'+(x.volvio?'':' <b>Ojo:</b> todavía no figura que haya vuelto en las listas.')+'</div>'+
+  '<div class="fila2" style="margin-top:6px"><div><label>¿Quién la cierra?</label><select id="avY'+i+'">'+op(FC.profes,quienSoy())+'</select></div>'+
+  '<div style="display:flex;align-items:flex-end"><button class="btn" style="width:auto;padding:10px 16px;background:#2e7d32" onclick="marcarVolvio('+i+')">✅ Cerrar alerta</button></div></div><div id="avM'+i+'"></div></div>';});}
+function marcarVolvio(i){var x=ALR_VISTA[i],m=el('avM'+i);if(!x)return;var quien=val('avY'+i);if(quien)guardado('gaussCsaYo',quien);
+ m.innerHTML='<div class="ayuda">Guardando…</div>';
+ pedir('alertaMarcar',{clave:x.clave,accion:'volvio',quien:quien},function(){
+  ALR.alertas=ALR.alertas.filter(function(a){return a.clave!==x.clave;});var b=el('bAlr');if(b)b.innerHTML=txtBotonAlr();
+  var y=window.scrollY;pintarAlertas();window.scrollTo(0,y);},function(e){falla(e,'avM'+i);});}
 function val(id){var e=el(id);return e?e.value:"";}
 function formAlerta(i){var x=ALR_VISTA[i],d=el('al'+i+'f');if(!x||!d)return;
  conFC(function(){d.innerHTML='<div style="background:#f3f5f9;border-radius:8px;padding:10px;margin-top:8px">'+
