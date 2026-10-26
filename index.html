@@ -134,7 +134,7 @@ function pedirPin(m){el('volver').style.display='none';msg('');
 function entrar(){PIN=el('pin').value.trim();guardado('gaussPinCSA',PIN);cargar();}
 
 function cargar(){el('app').innerHTML='';msg('Cargando alumnos…');
- function listo(){inicio();cargarAlertas();var pl=function(){pedir('formCSA',{},function(d){FC=d;},function(){});};
+ function listo(){inicio();cargarAlertas();cargarCal();cargarExamenes();var pl=function(){pedir('formCSA',{},function(d){FC=d;},function(){});};
   sbLeer('csaForm','todo',function(d){if(d.hoy){var x=new Date();d.hoy=new Date(x.getTime()-x.getTimezoneOffset()*60000).toISOString().slice(0,10);}FC=d;pl();},pl);}
  sbLeer('csaLista','todo',function(l){LISTA=l;listo();
    pedir('lista',{},function(l2){LISTA=l2;},function(e){if(String(e.message||'').indexOf('PIN:')>=0)falla(e);});},
@@ -149,9 +149,11 @@ function botonPerfil(){return ACTUAL?'<button class="btn az" onclick="perfil(\''
 
 // ---------- INICIO ----------
 function inicio(){NAV++;sbMarca('');el('volver').style.display='none';msg('');window.scrollTo(0,0);ACTUAL=null;
- el('app').innerHTML='<div class="botones">'+
+ el('app').innerHTML='<div id="avisosCal"></div><div class="botones">'+
   '<button class="bgrande" style="background:#1f4e79" onclick="buscarPerfil()">👤 Perfil del alumno<small>Asistencia, notas, seguimiento · informe para padres</small></button>'+
   '<button class="bgrande" id="bAlr" style="background:#b71c1c" onclick="alertas()">'+txtBotonAlr()+'</button>'+
+  '<button class="bgrande" id="bExa" style="background:#6a1b9a" onclick="examenes()">'+txtBotonExa()+'</button>'+
+  '<button class="bgrande" style="background:#1565c0" onclick="calendario()">📅 Calendario<small>Exámenes, días de lluvia, sin clase y otras actividades de la semana</small></button>'+
   '<button class="bgrande" style="background:#00838f" onclick="listaGrupo()">📊 Resumen de grupo<small>Semáforo, asistencia, notas y deuda de cada alumno</small></button>'+
   '<button class="bgrande" style="background:#c0392b" onclick="pdfNotas()">🖨️ PDF de notas<small>Notas de un grupo: un examen o todos</small></button>'+
   '<button class="bgrande" style="background:#2e7d32" onclick="justificativo()">🩺 Justificativo<small>Cuando avisan que faltó o va a faltar</small></button>'+
@@ -160,7 +162,167 @@ function inicio(){NAV++;sbMarca('');el('volver').style.display='none';msg('');wi
   '<button class="bgrande" style="background:#6a1b9a" onclick="cambiarGrupo()">🔄 Cambiar de grupo<small>Pasar a un alumno a otro grupo</small></button>'+
   '<button class="bgrande" style="background:#455a64" onclick="baja()">🚪 Salió del grupo<small>Cuando un alumno deja el cursillo</small></button>'+
   '<button class="bgrande" style="background:#37474f" onclick="cargasSemana()">📒 Cargas de la semana<small>Observaciones, contactos, justificativos… de sábado a viernes</small></button>'+
-  '</div><div class="ayuda" style="text-align:center;margin-top:16px">'+LISTA.length+' alumnos · datos del CSA (se actualizan cada hora)</div>';}
+  '</div><div class="ayuda" style="text-align:center;margin-top:16px">'+LISTA.length+' alumnos · datos del CSA (se actualizan cada hora)</div>';pintarAvisos();}
+
+// ---------- 📅 CALENDARIO ----------
+var CAL=null,CAL_OFF=0,CAL_ED=null;
+var CAL_TIPO={'Examen':['📝','#6a1b9a','#efe3f7'],'Lluvia':['🌧️','#1565c0','#e3f0fc'],'Sin clase':['🚫','#616161','#eeeeee'],'Otro':['📌','#e65100','#fff0e0']};
+var DSEM=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+function isoMas(iso,n){return isoMenos(iso,-n);}
+function dowIso(iso){var q=iso.split('-').map(Number);return new Date(Date.UTC(q[0],q[1]-1,q[2])).getUTCDay();}
+function ddmmIso(iso){var p=iso.split('-');return p[2]+'/'+p[1];}
+// lunes de la semana que se muestra: el domingo ya muestra la semana que empieza
+function calLunes(){var h=(CAL&&CAL.hoy)||hoyIso(),d=dowIso(h),l=d===0?isoMas(h,1):isoMenos(h,d-1);return isoMas(l,7*CAL_OFF);}
+function calTxt(x){var t=CAL_TIPO[x.tipo]||CAL_TIPO.Otro;
+ return t[0]+' '+(x.tipo==='Examen'?'Examen '+esc(x.materia):x.tipo==='Otro'?esc(x.nombre):x.tipo==='Lluvia'?'Día de lluvia':'Sin clase')+
+  ' · '+esc(x.grupos.join(', '));}
+function cargarCal(){var pon=function(d){CAL=d;pintarAvisos();};
+ sbLeer('csaCal','todo',function(d){pon(d);pedir('calendario',{},pon,function(){});},function(){pedir('calendario',{},pon,function(){});});}
+// Avisos en el inicio: hoy y los próximos 6 días
+function pintarAvisos(){var b=el('avisosCal');if(!b||!CAL)return;var h=CAL.hoy,fin=isoMas(h,6);
+ var l=CAL.items.filter(function(x){return x.iso>=h&&x.iso<=fin;});
+ if(!l.length){b.innerHTML='';return;}
+ b.innerHTML='<div class="card" style="border-left:6px solid #1565c0;cursor:pointer" onclick="calendario()"><b>📅 Próximos días</b>'+
+  l.slice(0,6).map(function(x){var t=CAL_TIPO[x.tipo]||CAL_TIPO.Otro;
+   return '<div style="margin-top:6px;padding:6px 8px;border-radius:8px;background:'+t[2]+'"><b>'+(x.iso===h?'HOY':DSEM[x.dow].slice(0,3)+' '+esc(x.fecha))+'</b> · '+
+    (x.turno==='Todo el día'?'todo el día':x.turno==='Mañana'?'☀️ mañana':'🌙 tarde')+'<br>'+calTxt(x)+(x.nota?' <span class="ayuda">· '+esc(x.nota)+'</span>':'')+'</div>';}).join('')+
+  (l.length>6?'<div class="ayuda" style="margin-top:4px">y '+(l.length-6)+' más…</div>':'')+
+  '<div class="ayuda" style="margin-top:6px">Tocá para ver el calendario</div></div>';}
+function calendario(){pantalla('<div class="card">Cargando calendario…</div>');
+ rapido('calendario',{},'csaCal','todo',function(d){CAL=d;pintarCal();},function(e){falla(e);});}
+function calMover(n){CAL_OFF=n===0?0:CAL_OFF+n;pintarCal();window.scrollTo(0,0);}
+function pintarCal(){if(!CAL)return;var lun=calLunes(),sab=isoMas(lun,5),hoy=CAL.hoy;
+ var h='<div class="card"><h2>📅 Calendario</h2><div style="font-size:17px;font-weight:bold;text-align:center">Semana del '+ddmmIso(lun)+' al '+ddmmIso(sab)+(CAL_OFF===0?' <span class="ayuda">(esta semana)</span>':'')+'</div>'+
+  '<div style="display:flex;gap:6px;margin-top:10px"><button class="mini" style="flex:1;padding:11px" onclick="calMover(-1)">◀ Anterior</button>'+
+  '<button class="mini" style="flex:1;padding:11px;background:#1565c0" onclick="calMover(0)">Hoy</button>'+
+  '<button class="mini" style="flex:1;padding:11px" onclick="calMover(1)">Siguiente ▶</button></div>'+
+  '<div class="ayuda" style="margin-top:8px">📝 Examen: el que falta a la lista de ese turno sale en "Ausencias en exámenes". 🌧️ Lluvia y 🚫 Sin clase: la lista se llama igual, pero ese turno no cuenta para nada (% de asistencia, faltas seguidas, resumen).</div></div>';
+ for(var i=0;i<6;i++){var iso=isoMas(lun,i),es=iso===hoy,del=CAL.items.filter(function(x){return x.iso===iso;});
+  var turno=function(t,ic){var l=del.filter(function(x){return x.turno===t;});
+   return '<div style="display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-top:1px solid #eee"><div style="min-width:78px;font-weight:bold;color:#555">'+ic+' '+t+'</div><div style="flex:1">'+
+    l.map(itemCal).join('')+'<button class="mini" style="background:#e8f0fe;color:#1565c0;padding:6px 10px;margin-top:'+(l.length?'4px':'0')+'" onclick="formCal(\''+iso+'\',\''+t+'\')">＋ Agregar</button></div></div>';};
+  var td=del.filter(function(x){return x.turno==='Todo el día';});
+  h+='<div class="card" style="'+(es?'border:2px solid #1565c0;':'')+'padding-bottom:6px"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:17px">'+DSEM[(i+1)%7].toUpperCase()+' '+ddmmIso(iso)+'</b>'+
+   (es?'<span style="background:#1565c0;color:#fff;border-radius:10px;padding:2px 9px;font-size:12px">HOY</span>':'')+'</div>'+
+   (td.length?'<div style="padding:6px 0">'+td.map(itemCal).join('')+'</div>':'')+
+   turno('Mañana','☀️')+turno('Tarde','🌙')+'</div>';}
+ el('app').innerHTML=h;}
+function itemCal(x){var t=CAL_TIPO[x.tipo]||CAL_TIPO.Otro,k=CAL.items.indexOf(x);
+ return '<div onclick="formCal(null,null,'+k+')" style="cursor:pointer;background:'+t[2]+';border-left:4px solid '+t[1]+';border-radius:8px;padding:7px 9px;margin-bottom:4px;font-size:14px">'+
+  (x.turno==='Todo el día'?'<span class="ayuda">Todo el día · </span>':'')+calTxt(x)+
+  (x.nota?'<div class="ayuda">'+esc(x.nota)+'</div>':'')+
+  (x.tipo==='Examen'&&x.aus!==null&&x.aus!==undefined?'<div style="margin-top:3px;font-weight:bold;color:'+(x.aus?'#b71c1c':'#1b8a3a')+'">'+(x.aus?x.aus+' ausente'+(x.aus>1?'s':'')+' → ver':'✓ Sin ausentes (según la lista)')+'</div>':'')+'</div>';}
+// formulario: nuevo (iso, turno) o editar (k = índice en CAL.items)
+function formCal(iso,turno,k){var x=k!==undefined?CAL.items[k]:null;
+ CAL_ED={id:x?x.id:'',tipo:x?x.tipo:'Examen',grupos:x?x.grupos.slice():[]};
+ conFC(function(){var tipos=['Examen','Lluvia','Sin clase','Otro'];
+  var h='<div class="card"><h2>'+(x?'✏️ Editar actividad':'＋ Agregar actividad')+'</h2>'+
+   (x&&x.tipo==='Examen'&&x.aus?'<button class="btn" style="background:#6a1b9a;margin-top:0" onclick="examenes()">📝 Ver los '+x.aus+' ausentes</button>':'')+
+   '<label>Tipo</label><div id="cfTipos" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">'+tipos.map(function(t){return '<button class="mini" data-t="'+t+'" onclick="calTipo(\''+t+'\')">'+CAL_TIPO[t][0]+' '+t+'</button>';}).join('')+'</div>'+
+   '<div class="fila2"><div><label>Día</label><input type="date" id="cfF" value="'+esc(x?x.iso:iso)+'"></div>'+
+   '<div><label>Turno</label><select id="cfT">'+['Mañana','Tarde','Todo el día'].map(function(t){return '<option'+(t===(x?x.turno:turno)?' selected':'')+'>'+t+'</option>';}).join('')+'</select></div></div>'+
+   '<label>Grupo(s) <span class="req">*</span></label><div id="cfG" style="margin-top:4px"></div>'+
+   '<div id="cfMat"><label>Materia <span class="req">*</span></label><select id="cfM"></select></div>'+
+   '<div id="cfNom"><label>Nombre de la actividad <span class="req">*</span></label><input id="cfN" placeholder="ej. Charla de la FIUNA" value="'+esc(x?x.nombre:'')+'"></div>'+
+   '<label>Nota <span class="ayuda">(opcional)</span></label><input id="cfO" value="'+esc(x?x.nota:'')+'" placeholder="ej. aula 3, traer calculadora">'+
+   '<label>¿Quién lo carga?</label><select id="cfY">'+op(FC.profes,(x&&x.por)||quienSoy())+'</select>'+
+   '<button class="btn" onclick="guardarCal()">💾 Guardar</button>'+
+   (x?'<button class="btn gr" onclick="borrarCal()">🗑️ Borrar actividad</button>':'')+
+   '<button class="btn gr" style="background:#999" onclick="pintarCalVolver()">Cancelar</button><div id="cfMsg"></div></div>';
+  pantalla(h);calTipo(CAL_ED.tipo,x?x.materia:'');});}
+function pintarCalVolver(){NAV++;el('volver').style.display='inline-block';pintarCal();window.scrollTo(0,0);}
+function calTipo(t,mat){CAL_ED.tipo=t;
+ [].forEach.call(document.querySelectorAll('#cfTipos button'),function(b){var on=b.getAttribute('data-t')===t,c=CAL_TIPO[b.getAttribute('data-t')];b.style.background=on?c[1]:c[2];b.style.color=on?'#fff':c[1];b.style.padding='10px 13px';});
+ el('cfMat').style.display=t==='Examen'?'':'none';el('cfNom').style.display=t==='Otro'?'':'none';
+ if(t!=='Examen'&&!CAL_ED.grupos.length&&(t==='Lluvia'||t==='Sin clase'))CAL_ED.grupos=['Todos'];
+ if(t==='Examen')CAL_ED.grupos=CAL_ED.grupos.filter(function(g){return g!=='Todos';});
+ pintarGruposCal(mat);}
+function pintarGruposCal(mat){var gs=(CAL&&CAL.grupos)||FC.grupos||[],sel=CAL_ED.grupos,todos=sel.indexOf('Todos')>=0;
+ var chk=function(g,txt){var on=g==='Todos'?todos:(!todos&&sel.indexOf(g)>=0);
+  return '<label style="display:flex;align-items:center;gap:8px;font-weight:normal;margin:0;padding:7px 4px;border-bottom:1px solid #f0f0f0"><input type="checkbox" style="width:22px;height:22px;margin:0" '+(on?'checked':'')+' onchange="calGrupo(\''+esc(g).replace(/'/g,"\\'")+'\',this.checked)">'+txt+'</label>';};
+ el('cfG').innerHTML=(CAL_ED.tipo!=='Examen'?chk('Todos','<b>Todos los grupos</b>'):'')+gs.map(function(g){return chk(g,esc(g));}).join('');
+ // materias: las de los grupos elegidos
+ var M={};(todos?gs:sel).forEach(function(g){((CAL&&CAL.materias&&CAL.materias[g])||[]).forEach(function(m){M[m]=1;});});
+ var ms=Object.keys(M),cur=mat!==undefined?mat:val('cfM');if(cur&&ms.indexOf(cur)<0)ms.push(cur);
+ el('cfM').innerHTML='<option value="">'+(sel.length?'Elegí la materia':'Primero elegí el grupo')+'</option>'+ms.map(function(m){return '<option'+(m===cur?' selected':'')+'>'+esc(m)+'</option>';}).join('');}
+function calGrupo(g,on){var s=CAL_ED.grupos;
+ if(g==='Todos')CAL_ED.grupos=on?['Todos']:[];
+ else{s=s.filter(function(x){return x!=='Todos'&&x!==g;});if(on)s.push(g);CAL_ED.grupos=s;}
+ pintarGruposCal();}
+function guardarCal(){var m=el('cfMsg'),t=CAL_ED.tipo,q=val('cfY');
+ if(!val('cfF')){m.innerHTML='<div class="err">Falta el día.</div>';return;}
+ if(!CAL_ED.grupos.length){m.innerHTML='<div class="err">Elegí al menos un grupo.</div>';return;}
+ if(t==='Examen'&&!val('cfM')){m.innerHTML='<div class="err">Elegí la materia del examen.</div>';return;}
+ if(t==='Otro'&&!val('cfN').trim()){m.innerHTML='<div class="err">Escribí el nombre de la actividad.</div>';return;}
+ if(q)guardado('gaussCsaYo',q);m.innerHTML='<div class="ayuda">Guardando…</div>';
+ pedir('calGuardar',{id:CAL_ED.id,tipo:t,fecha:val('cfF'),turno:val('cfT'),grupos:CAL_ED.grupos.join('|'),materia:t==='Examen'?val('cfM'):'',
+  nombre:t==='Otro'?val('cfN').trim():'',nota:val('cfO').trim(),quien:q},function(){
+   var d=val('cfF'),lun=calLunes();CAL_OFF+=Math.floor(((Date.parse(d)-Date.parse(lun))/864e5)/7);
+   pedir('calendario',{},function(D){CAL=D;pintarCalVolver();},function(){pintarCalVolver();});},function(e){falla(e,'cfMsg');});}
+function borrarCal(){var m=el('cfMsg');if(!CAL_ED.id)return;
+ if(!el('cfBorra')){m.innerHTML='<div class="aviso" id="cfBorra">¿Seguro que querés borrar esta actividad? <button class="mini" style="background:#c0392b" onclick="borrarCal()">Sí, borrar</button></div>';return;}
+ m.innerHTML='<div class="ayuda">Borrando…</div>';
+ pedir('calBorrar',{id:CAL_ED.id},function(){pedir('calendario',{},function(D){CAL=D;pintarCalVolver();},function(){pintarCalVolver();});},function(e){falla(e,'cfMsg');});}
+
+// ---------- 📝 AUSENCIAS EN EXÁMENES ----------
+var EXA=null,EXA_G='',EXA_V=[],EXA_AB={};
+function cargarExamenes(){var pon=function(d){EXA=d;var b=el('bExa');if(b)b.innerHTML=txtBotonExa();};
+ sbLeer('csaExam','todo',function(d){pon(d);pedir('examenes',{},pon,function(){});},function(){pedir('examenes',{},pon,function(){});});}
+function txtBotonExa(){var l=EXA?EXA.alertas.filter(function(x){return !x.justificado;}):[],a=l.filter(function(x){return x.atrasada;}).length;
+ return '📝 Ausencias en exámenes'+(EXA?' <span style="background:#fff;color:#6a1b9a;border-radius:12px;padding:1px 9px;font-size:15px">'+l.length+'</span>':'')+
+  '<small>Los que no vinieron a rendir'+(a?' · ⚠️ '+a+' atrasada'+(a>1?'s':''):'')+'</small>';}
+function examenes(){pantalla('<div class="card">Cargando ausencias en exámenes…</div>');
+ rapido('examenes',{},'csaExam','todo',function(d){EXA=d;pintarExa();},function(e){falla(e);});}
+function pintarExa(){if(!EXA)return;var L=EXA.alertas,grupos={};L.forEach(function(x){grupos[x.grupo]=1;});
+ var l=L.filter(function(x){return !EXA_G||x.grupo===EXA_G;}).sort(function(a,b){return (a.justificado?1:0)-(b.justificado?1:0)||(b.atrasada?1:0)-(a.atrasada?1:0)||(a.iso<b.iso?1:a.iso>b.iso?-1:0)||a.alumno.localeCompare(b.alumno,'es');});
+ var pend=L.filter(function(x){return !x.justificado;}).length;
+ var h='<div class="card"><h2>📝 Ausencias en exámenes · '+pend+' pendiente'+(pend===1?'':'s')+'</h2>'+
+  '<div class="ayuda">Sale apenas se carga la lista del turno del examen (si el examen está en el 📅 calendario) o cuando se cargan las notas con <b>A</b>. Faltar a un examen ya es alerta. '+
+  '<b>Atrasada</b> = más de '+(EXA.horas||48)+' h sin que nadie intente contactar. Con 🩺 justificativo no cuenta como pendiente.</div>'+
+  '<div style="margin-top:8px"><select onchange="EXA_G=this.value;pintarExa()"><option value="">Todos los grupos</option>'+
+  Object.keys(grupos).sort(function(a,b){return a.localeCompare(b,'es',{numeric:true});}).map(function(g){return '<option'+(g===EXA_G?' selected':'')+'>'+esc(g)+'</option>';}).join('')+'</select></div>'+
+  '<button class="mini" style="margin-top:8px;background:#1565c0;padding:9px 12px" onclick="calendario()">📅 Ir al calendario</button></div>';
+ if(!l.length)h+='<div class="card"><div class="vacio">✓ Nadie faltó a un examen (con este filtro).</div></div>';
+ l.forEach(function(x,i){var k='ex'+i,ab=!!EXA_AB[x.clave];
+  h+='<div class="card'+(x.atrasada?' r':'')+'" style="'+(x.justificado?'opacity:.75;background:#f3f5f9':'')+'"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><div>'+
+   '<b style="font-size:16px'+(x.id?';cursor:pointer;text-decoration:underline':'')+'"'+(x.id?' onclick="perfil(\''+esc(x.id)+'\')"':'')+'>'+esc(x.alumno)+'</b>'+
+   '<div class="sub">'+esc(x.grupo)+(x.enc?' · encargado: '+esc(x.enc):'')+'</div></div>'+
+   '<div>'+(x.justificado?'<span style="background:#2e7d32;color:#fff;border-radius:10px;padding:3px 9px;font-size:12px">🩺 justificado</span>':'<span style="background:#6a1b9a;color:#fff;border-radius:10px;padding:3px 9px;font-size:12px">No vino a rendir</span>')+
+   (x.atrasada?' <span style="background:#7f0000;color:#fff;border-radius:10px;padding:3px 9px;font-size:12px">⚠️ atrasada</span>':'')+'</div></div>'+
+   '<div style="margin-top:6px"><b>📝 '+esc(x.materia||'Examen')+'</b> · '+esc(x.diaTxt)+(x.turno&&x.turno!=='Todo el día'?' · '+esc(x.turno.toLowerCase()):'')+'</div>'+
+   (x.nota?'<div class="ayuda" style="margin-top:4px">📝 '+esc(x.nota)+'</div>':'')+
+   '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+
+   (x.waAl?'<a class="wa" href="'+esc(x.waAl)+'" target="_blank">📲 Alumno</a>':(x.sinCel?'<span class="ayuda">📵 sin cel. alumno</span>':''))+
+   (x.waRe?'<a class="wa" style="background:#128c7e" href="'+esc(x.waRe)+'" target="_blank">📲 Responsable'+(x.resp?' ('+esc(x.resp.split(' ')[0])+')':'')+'</a>':(x.sinCelR?'<span class="ayuda">📵 sin cel. resp.</span>':''))+
+   (x.justificado?'<button class="mini" style="background:#2e7d32;color:#fff;padding:8px 12px" onclick="formExa('+i+',1)">✔ Visto, cerrar</button>'
+    :'<button class="mini" style="background:#1b8a3a;color:#fff;padding:8px 12px" onclick="formExa('+i+')">✔ Contactamos / 📵 No respondió</button>')+'</div>'+
+   '<div style="margin-top:8px"><a href="javascript:void 0" style="color:#1565c0;font-size:14px;text-decoration:none" onclick="verMasExa('+i+')">'+(ab?'▾ Ver menos':'▸ Ver más')+'</a></div>'+
+   (ab?'<div style="background:#f3f5f9;border-radius:8px;padding:10px;margin-top:6px;font-size:14px">'+
+     '<div><b>Se detectó por:</b> '+esc(x.origen==='calendario'?'el calendario y la lista del turno':x.origen==='notas'?'las notas (cargaron A)':'el calendario y las notas')+'</div>'+
+     (x.justificado?'<div style="margin-top:4px"><b>🩺</b> Tiene la falta justificada ese día.</div>':'')+
+     '<div style="margin-top:4px"><b>Fecha:</b> '+esc(fecha(x.iso))+'</div></div>':'')+
+   '<div id="'+k+'f"></div></div>';});
+ el('app').innerHTML=h;EXA_V=l;}
+function verMasExa(i){var x=EXA_V[i];if(!x)return;if(EXA_AB[x.clave])delete EXA_AB[x.clave];else EXA_AB[x.clave]=1;var y=window.scrollY;pintarExa();window.scrollTo(0,y);}
+function formExa(i,cerrar){var x=EXA_V[i],d=el('ex'+i+'f');if(!x||!d)return;
+ conFC(function(){d.innerHTML='<div style="background:#f3f5f9;border-radius:8px;padding:10px;margin-top:8px">'+
+  (cerrar?'<div class="ayuda">Tiene justificativo: se cierra sin contactar.</div>':
+   '<div class="fila2"><div><label>¿Con quién?</label><select id="exQ'+i+'"><option value="alumno">Alumno</option><option value="responsable">Responsable</option><option value="ambos">Los dos</option></select></div>'+
+   '<div><label>¿Quién contactó?</label><select id="exY'+i+'">'+op(FC.profes,quienSoy())+'</select></div></div>'+
+   '<label>¿Qué dijo? <span class="ayuda">(para "Ya nos contactamos")</span></label><input id="exN'+i+'" placeholder="ej. estuvo enfermo, trae certificado">')+
+  (cerrar?'<label>¿Quién lo cierra?</label><select id="exY'+i+'">'+op(FC.profes,quienSoy())+'</select>':'')+
+  '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">'+
+  (cerrar?'<button class="btn" style="width:auto;padding:10px 16px;background:#2e7d32" onclick="marcarExa('+i+',\'cerrar\')">✔ Cerrar</button>':
+   '<button class="btn" style="width:auto;padding:10px 16px" onclick="marcarExa('+i+',\'contactado\')">✔ Ya nos contactamos</button>'+
+   '<button class="btn gr" style="width:auto;padding:10px 16px;background:#666" onclick="marcarExa('+i+',\'norespondio\')">📵 No respondió</button>')+
+  '</div><div id="exM'+i+'"></div></div>';});}
+function marcarExa(i,accion){var x=EXA_V[i],m=el('exM'+i);if(!x)return;var nota=val('exN'+i).trim(),quien=val('exY'+i);
+ if(accion==='contactado'&&!nota){m.innerHTML='<div class="err">Escribí qué te dijeron (una nota corta).</div>';return;}
+ if(quien)guardado('gaussCsaYo',quien);m.innerHTML='<div class="ayuda">Guardando…</div>';
+ pedir('examenMarcar',{clave:x.clave,accion:accion,aquien:val('exQ'+i),nota:nota,quien:quien,alumno:x.alumno,grupo:x.grupo,examen:(x.materia||'examen')+' del '+x.diaTxt},function(){
+  if(accion!=='norespondio')EXA.alertas=EXA.alertas.filter(function(a){return a.clave!==x.clave;});
+  else{x.intentado=true;x.atrasada=false;x.nota=(x.nota?x.nota+' · ':'')+'📵 No respondió ('+(quien||'CSA')+')';}
+  var y=window.scrollY;pintarExa();window.scrollTo(0,y);},function(e){falla(e,'exM'+i);});}
 
 // ---------- BUSCADOR DE ALUMNO (paso 1 de cada botón) ----------
 function buscadorHtml(tit){return '<div class="card"><h2><span class="paso">1</span>'+esc(tit)+'</h2><div id="pbox">'+
@@ -314,14 +476,14 @@ function pintarAlertas(){if(!ALR)return;var L0=ALR.alertas.filter(alrEnRango),R=
 var ALR_VISTA=[],ALR_AB={};
 function verMasAlr(i){var x=ALR_VISTA[i];if(!x)return;if(ALR_AB[x.clave])delete ALR_AB[x.clave];else ALR_AB[x.clave]=1;var y=window.scrollY;pintarAlertas();window.scrollTo(0,y);}
 // lo que se despliega con "▸ Ver más"
-function masAlr(x){var col={P:['#1b8a3a','vino'],T:['#e0a800','tarde/retiro'],J:['#1565c0','justificado'],A:['#c0392b','faltó']},fila=function(ic,tit,txt){return '<div style="margin-top:6px"><b>'+ic+' '+tit+':</b> '+txt+'</div>';};
+function masAlr(x){var col={P:['#1b8a3a','vino'],T:['#e0a800','tarde/retiro'],J:['#1565c0','justificado'],A:['#c0392b','faltó'],L:['#9e9e9e','lluvia / sin clase (no cuenta)']},fila=function(ic,tit,txt){return '<div style="margin-top:6px"><b>'+ic+' '+tit+':</b> '+txt+'</div>';};
  var h='<div style="background:#f3f5f9;border-radius:8px;padding:10px;margin-top:6px;font-size:14px">';
  if(x.faltoDias)h+=fila('📅','Faltó',esc(x.faltoDias));
  else if(x.detalle)h+=fila('📅','Detalle',esc(x.detalle));
  if(x.dias15&&x.dias15.length){
   h+='<div style="margin-top:6px"><b>🗓️ Últimos 15 días'+(x.p15!==null&&x.p15!==undefined?' · '+x.p15+'% asistencia':'')+':</b></div><div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:4px">'+
    x.dias15.map(function(d){var c=col[d.r]||col.A;return '<span title="'+c[1]+'" style="background:'+c[0]+';color:#fff;border-radius:6px;padding:2px 6px;font-size:12px">'+esc(d.d)+'</span>';}).join('')+'</div>'+
-   '<div class="ayuda" style="margin-top:3px">verde vino · amarillo tarde/retiro · azul justificado · rojo faltó</div>';}
+   '<div class="ayuda" style="margin-top:3px">verde vino · amarillo tarde/retiro · azul justificado · rojo faltó · gris lluvia/sin clase</div>';}
  else if(x.p15!==null&&x.p15!==undefined)h+=fila('🗓️','Asistencia 15 días',x.p15+'%');
  if(x.obsProf)h+=fila('👩‍🏫','Lo último que anotó el profe',esc(x.obsProf));
  if(x.jus&&x.jus.length)h+=fila('🩺','Justificativo',x.jus.map(esc).join('<br>'));
