@@ -265,20 +265,25 @@ function borrarCal(){var m=el('cfMsg');if(!CAL_ED.id)return;
  pedir('calBorrar',{id:CAL_ED.id},function(){pedir('calendario',{},function(D){CAL=D;pintarCalVolver();},function(){pintarCalVolver();});},function(e){falla(e,'cfMsg');});}
 
 // ---------- 📝 AUSENCIAS EN EXÁMENES ----------
-var EXA=null,EXA_G='',EXA_V=[],EXA_AB={};
+var EXA=null,EXA_G='',EXA_V=[],EXA_AB={},EXA_D='',EXA_H='';
+function exaRango(){var hoy=(EXA&&EXA.hoy)||hoyIso();return [EXA_D||isoMenos(hoy,7),EXA_H||hoy];}
+function exaEnRango(x){var r=exaRango();return !x.iso||(x.iso>=r[0]&&x.iso<=r[1]);}
 function cargarExamenes(){var pon=function(d){EXA=d;var b=el('bExa');if(b)b.innerHTML=txtBotonExa();};
  sbLeer('csaExam','todo',function(d){pon(d);pedir('examenes',{},pon,function(){});},function(){pedir('examenes',{},pon,function(){});});}
-function txtBotonExa(){var l=EXA?EXA.alertas.filter(function(x){return !x.justificado;}):[],a=l.filter(function(x){return x.atrasada;}).length;
+function txtBotonExa(){var l=EXA?EXA.alertas.filter(function(x){return !x.justificado&&exaEnRango(x);}):[],a=l.filter(function(x){return x.atrasada;}).length;
  return '📝 Ausencias en exámenes'+(EXA?' <span style="background:#fff;color:#6a1b9a;border-radius:12px;padding:1px 9px;font-size:15px">'+l.length+'</span>':'')+
-  '<small>Los que no vinieron a rendir'+(a?' · ⚠️ '+a+' atrasada'+(a>1?'s':''):'')+'</small>';}
+  '<small>Últimos 7 días · los que no vinieron a rendir'+(a?' · ⚠️ '+a+' atrasada'+(a>1?'s':''):'')+'</small>';}
 function examenes(){pantalla('<div class="card">Cargando ausencias en exámenes…</div>');
  rapido('examenes',{},'csaExam','todo',function(d){EXA=d;pintarExa();},function(e){falla(e);});}
-function pintarExa(){if(!EXA)return;var L=EXA.alertas,grupos={};L.forEach(function(x){grupos[x.grupo]=1;});
+function pintarExa(){if(!EXA)return;var L=EXA.alertas.filter(exaEnRango),R=exaRango(),grupos={};L.forEach(function(x){grupos[x.grupo]=1;});
  var l=L.filter(function(x){return !EXA_G||x.grupo===EXA_G;}).sort(function(a,b){return (a.justificado?1:0)-(b.justificado?1:0)||(b.atrasada?1:0)-(a.atrasada?1:0)||(a.iso<b.iso?1:a.iso>b.iso?-1:0)||a.alumno.localeCompare(b.alumno,'es');});
  var pend=L.filter(function(x){return !x.justificado;}).length;
  var h='<div class="card"><h2>📝 Ausencias en exámenes · '+pend+' pendiente'+(pend===1?'':'s')+'</h2>'+
   '<div class="ayuda">Sale apenas se carga la lista del turno del examen (si el examen está en el 📅 calendario) o cuando se cargan las notas con <b>A</b>. Faltar a un examen ya es alerta. '+
   '<b>Atrasada</b> = más de '+(EXA.horas||48)+' h sin que nadie intente contactar. Con 🩺 justificativo no cuenta como pendiente.</div>'+
+  '<div class="fila2" style="margin-top:8px"><div><label>Desde</label><input type="date" value="'+R[0]+'" onchange="EXA_D=this.value;pintarExa()"></div>'+
+  '<div><label>Hasta</label><input type="date" value="'+R[1]+'" onchange="EXA_H=this.value;pintarExa()"></div></div>'+
+  '<div class="ayuda" style="margin-top:4px">Por defecto, los exámenes de los últimos 7 días.</div>'+
   '<div style="margin-top:8px"><select onchange="EXA_G=this.value;pintarExa()"><option value="">Todos los grupos</option>'+
   Object.keys(grupos).sort(function(a,b){return a.localeCompare(b,'es',{numeric:true});}).map(function(g){return '<option'+(g===EXA_G?' selected':'')+'>'+esc(g)+'</option>';}).join('')+'</select></div>'+
   '<button class="mini" style="margin-top:8px;background:#1565c0;padding:9px 12px" onclick="calendario()">📅 Ir al calendario</button></div>';
