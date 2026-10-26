@@ -714,7 +714,7 @@ function cargasSemana(){pantalla('<div class="card"><h2>📒 Cargas de la semana
 // orden de las cargas: por defecto lo último cargado arriba (el servidor manda de más viejo a más nuevo)
 var CS_ORDEN=guardado('gaussCsOrden')||'nuevo',CS_ULT=null;
 function csOrdTxt(){return CS_ORDEN==='nuevo'?'↓ Más nuevos primero':'↑ Más viejos primero';}
-function csCambiarOrden(){CS_ORDEN=CS_ORDEN==='nuevo'?'viejo':'nuevo';guardado('gaussCsOrden',CS_ORDEN);var b=el('csOrd');if(b)b.textContent=csOrdTxt();if(CS_ULT&&el('csR'))el('csR').innerHTML=csPintar(CS_ULT);}
+function csCambiarOrden(){CS_ORDEN=CS_ORDEN==='nuevo'?'viejo':'nuevo';guardado('gaussCsOrden',CS_ORDEN);var b=el('csOrd');if(b)b.textContent=csOrdTxt();if(CS_ULT&&el('csL'))csListas();}
 function csOrdenar(R){var X={};Object.keys(R).forEach(function(k){X[k]=Array.isArray(R[k])&&k!=='medios'&&CS_ORDEN==='nuevo'?R[k].slice().reverse():R[k];});return X;}
 function csIr(m){CS_MODO=m;['0','1','X'].forEach(function(k){var b=el('cs'+k);if(b)b.className=(k===m||(k==='X'&&m==='x'))?'on':'';});
  el('csF').style.display=m==='x'?'block':'none';if(m!=='x')csVer({anterior:m});}
@@ -727,13 +727,29 @@ function csK(t,v){return '<div class="cs-k"><span>'+esc(t)+'</span><b>'+v+'</b><
 function csMil(n){return Math.round(Number(n)||0).toLocaleString('es-PY');}
 
 function CS_PEDIR(a,p,ok,mal){if(p.desde||p.hasta){NAV++;sbMarca('');pedir(a,p,ok,mal);return;}rapido(a,p,'csaCargas',p.anterior==='1'?'anterior':'actual',ok,mal);}
-function csPintar(R){CS_ULT=R;R=csOrdenar(R);var al=function(x){return x.id&&alumno(x.id)?'<span class="cs-al" onclick="perfil(\''+esc(x.id)+'\')">'+esc(x.alumno)+'</span>':esc(x.alumno);};
+function csPintar(R){CS_ULT=R;CS_LIM={obs:10,contactos:10,justif:10,informes:10};
  var h='<div class="card"><h2>Del '+esc(R.desde)+' al '+esc(R.hasta)+'</h2><div class="cs-res">'+
-  csK('Observaciones',R.obs.length)+csK('Contactos',R.contactos.length)+csK('Justificativos',R.justif.length)+csK('Informes padres',R.informes.length)+'</div>'+
-  '<div class="ayuda" style="margin-top:8px">Tocá un nombre para abrir su perfil.</div></div>';
- h+=csTabla('📝 Observaciones',['Día','Alumno','Tipo','Detalle','Resultado','Anotó'],R.obs.map(function(x){return [esc(x.dia),al(x),esc(x.tipo),esc(x.detalle),esc(x.resultado),esc(x.quien)];}));
- h+=csTabla('📞 Contactos',['Día','Alumno','Con quién','Motivo','Por','Nota'],R.contactos.map(function(x){return [esc(x.dia),al(x),esc(x.aquien),esc(x.motivo),esc(x.medio),esc(x.nota)];}));
- h+=csTabla('🩺 Justificativos',['Cargado','Alumno','Desde','Hasta','Motivo','Quién justificó','A quién'],R.justif.map(function(x){return [esc(x.dia),al(x),esc(x.desde),esc(x.hasta),esc(x.motivo),esc(x.quien),esc(x.aquien)];}));
- h+=csTabla('📄 Informes para padres',['Día','Alumno','Grupo','Generado por'],R.informes.map(function(x){return [esc(x.dia),al(x),esc(x.grupo),esc(x.quien)];}));
+  csK('Observaciones',R.obs.length)+csK('Contactos',csContactos(R.contactos).length)+csK('Justificativos',R.justif.length)+csK('Informes padres',R.informes.length)+'</div>'+
+  '<label>🔎 Buscar un alumno en estas cargas</label><input id="csQ" placeholder="Apellido, nombre o ID…" value="'+esc(CS_Q)+'" oninput="CS_Q=this.value;csListas()" autocomplete="off">'+
+  '<div class="ayuda" style="margin-top:6px">Busca en el período elegido. Para buscar más atrás, usá "Elegir fechas". Tocá un nombre para abrir su perfil.</div></div><div id="csL">'+csSecciones()+'</div>';
  return h;}
+var CS_Q='',CS_LIM={obs:10,contactos:10,justif:10,informes:10};
+function csListas(){var y=window.scrollY;if(el('csL'))el('csL').innerHTML=csSecciones();window.scrollTo(0,y);}
+function csMas(k){CS_LIM[k]+=10;csListas();}
+// un contacto marcado desde las alertas queda 2 veces (con quién + "Resuelta"): se muestra en una sola fila
+function csContactos(l){var M={},out=[];(l||[]).forEach(function(x){var k=[x.id,x.dia,x.motivo,x.medio,x.nota].join('|');
+  if(M[k]){if(!/^Resuelta/.test(x.aquien)&&M[k].aquien.indexOf(x.aquien)<0)M[k].aquien=(/^Resuelta/.test(M[k].aquien)?x.aquien:M[k].aquien+' · '+x.aquien);M[k].res=M[k].res||/^Resuelta/.test(x.aquien);return;}
+  var y={};for(var z in x)y[z]=x[z];y.res=/^Resuelta/.test(x.aquien);M[k]=y;out.push(y);});
+ out.forEach(function(x){if(x.res&&!/^Resuelta/.test(x.aquien))x.aquien+=' ✔';else if(/^Resuelta/.test(x.aquien))x.aquien='✔ Resuelta';});return out;}
+function csSecciones(){var R=csOrdenar(CS_ULT),q=sa(CS_Q.trim()),pal=q?q.split(/\s+/):[];
+ var al=function(x){return x.id&&alumno(x.id)?'<span class="cs-al" onclick="perfil(\''+esc(x.id)+'\')">'+esc(x.alumno)+'</span>':esc(x.alumno);};
+ var ok=function(x){if(!pal.length)return true;var t=sa((x.alumno||'')+' '+(x.id||''));return pal.every(function(w){return t.indexOf(w)>=0;});};
+ var sec=function(k,tit,enc,lista,fila){var l=lista.filter(ok),n=CS_LIM[k],vis=pal.length?l:l.slice(0,n);
+  var h=csTabla(tit,enc,vis.map(fila));h=h.replace('<span class="ayuda">('+vis.length+')</span>','<span class="ayuda">('+l.length+')</span>');
+  if(!pal.length&&l.length>n)h=h.replace(/<\/div>$/,'<button class="mini" style="margin-top:8px" onclick="csMas(\''+k+'\')">⬇ Ver 10 más (quedan '+(l.length-n)+')</button></div>');
+  return h;};
+ return sec('obs','📝 Observaciones',['Día','Alumno','Tipo','Detalle','Resultado','Anotó'],R.obs,function(x){return [esc(x.dia),al(x),esc(x.tipo),esc(x.detalle),esc(x.resultado),esc(x.quien)];})+
+  sec('contactos','📞 Contactos',['Día','Alumno','Con quién','Motivo','Por','Nota'],csContactos(R.contactos),function(x){return [esc(x.dia),al(x),esc(x.aquien),esc(x.motivo),esc(x.medio),esc(x.nota)];})+
+  sec('justif','🩺 Justificativos',['Cargado','Alumno','Desde','Hasta','Motivo','Quién justificó','A quién'],R.justif,function(x){return [esc(x.dia),al(x),esc(x.desde),esc(x.hasta),esc(x.motivo),esc(x.quien),esc(x.aquien)];})+
+  sec('informes','📄 Informes para padres',['Día','Alumno','Grupo','Generado por'],R.informes,function(x){return [esc(x.dia),al(x),esc(x.grupo),esc(x.quien)];});}
 </script></body></html>
