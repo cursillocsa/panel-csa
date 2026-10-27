@@ -687,18 +687,17 @@ function guardarCambio(){var a=PICK,g=el('cgG').value,m=el('cgM');
 function baja(id){var seguir=function(){abrir('¿Qué alumno salió?','bj',function(a){
  el('bj').innerHTML='<div class="card"><h2><span class="paso">2</span>Salió del grupo</h2>'+
   '<label>¿Cuándo avisó que ya no viene? <span class="req">*</span></label><input type="date" id="bA" value="'+FB.hoy+'">'+
-  '<label>Último día que vino <span class="req">*</span> <span class="ayuda" id="bUv">(buscando en las listas…)</span></label><input type="date" id="bF">'+
-  '<div class="ayuda">Sale solo de las listas (la última vez que tuvo presente); se puede cambiar. Las cuotas las revisa secretaría (le llega un aviso).</div>'+
+  '<div style="background:#f3f5f9;border-radius:8px;padding:10px;margin-top:12px"><b>Último día que vino:</b> <span id="bUv">buscando en las listas…</span><input type="hidden" id="bF">'+
+  '<div class="ayuda">Sale solo de las listas (la última vez que tuvo presente). Las cuotas las revisa secretaría (le llega un aviso).</div></div>'+
   '<label>Motivo</label>'+(FB.motivos.length?'<select id="bM">'+op(FB.motivos)+'</select>':'<input id="bM">')+
   '<label>Observación <span class="ayuda">(opcional)</span></label><input id="bO">'+
   '<button class="btn" id="bB" onclick="guardarBaja()">🚪 Confirmar salida</button><div id="bMsg"></div></div>';
- pedirAdm('bajaPrevia',{id:a[1]},function(r){if(!el('bF'))return;if(r.ultimaVez&&!el('bF').value)el('bF').value=r.ultimaVez;el('bUv').textContent=r.ultimaVez?'(según las listas: '+r.ultimaVezTxt+')':'(no aparece en las listas: escribila)';},
-  function(){if(el('bUv'))el('bUv').textContent='';});},id);};
+ pedirAdm('bajaPrevia',{id:a[1]},function(r){if(!el('bF'))return;el('bF').value=r.ultimaVez||'';el('bUv').innerHTML=r.ultimaVez?'<b>'+esc(r.ultimaVezTxt)+'</b>':'no figura en las listas (se usa el día que avisó)';},
+  function(){if(el('bUv'))el('bUv').textContent='se busca al guardar';});},id);};
  if(FB)seguir();else{msg('Cargando…');pedirAdm('formBaja',{},function(d){FB=d;msg('');seguir();},function(e){falla(e);});}}
 function guardarBaja(){var a=PICK,m=el('bMsg');
  if(!el('bA').value){m.innerHTML='<div class="err">Falta cuándo avisó.</div>';return;}
- if(!el('bF').value){m.innerHTML='<div class="err">Falta el último día que vino.</div>';return;}
- if(!confirm('¿Registrar que '+nombreDe(a)+' ('+(a[2]||'')+') salió?\n\nAvisó el '+fecha(el('bA').value)+'\nVino por última vez el '+fecha(el('bF').value)))return;
+ if(!confirm('¿Registrar que '+nombreDe(a)+' ('+(a[2]||'')+') salió?\n\nAvisó el '+fecha(el('bA').value)+(el('bF').value?'\nVino por última vez el '+fecha(el('bF').value):'')))return;
  var b=el('bB');b.disabled=true;b.textContent='Guardando…';ACTUAL=a;
  pedirAdm('baja',{id:a[1],fecha:el('bF').value,ultima:el('bF').value,aviso:el('bA').value,motivo:el('bM').value,obs:el('bO').value,quien:quienSoy()},function(r){a[3]='Salió';
    hecho(esc(r.nombre)+' salió de '+esc(r.grupo)+' desde el '+esc(r.fecha)+'.<br><span style="font-weight:normal;font-size:15px">Acordate de sacarlo del grupo de WhatsApp.</span>',otroBoton('🚪 Registrar otra salida','baja'));},
