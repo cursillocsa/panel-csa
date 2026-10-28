@@ -181,7 +181,7 @@ function pintarNuevos(){var b=el('avisoNuevos');if(!b)return;if(!NUEVOS||!NUEVOS
  b.innerHTML='<div class="card" style="border-left:6px solid #6fa8dc;background:#eef5fc;cursor:pointer" onclick="NUEVOS_AB=!NUEVOS_AB;pintarNuevos()">'+
   '<b>🆕 Hay '+NUEVOS.length+' nombre'+(NUEVOS.length>1?'s':'')+' nuevo'+(NUEVOS.length>1?'s':'')+' en las listas que no '+(NUEVOS.length>1?'están':'está')+' en Administración.</b>'+
   '<div class="ayuda">La secretaría tiene que revisar su situación de inscripción. En las listas se ven en celeste. '+(NUEVOS_AB?'(tocá para cerrar)':'(tocá para ver)')+'</div>'+
-  (NUEVOS_AB?NUEVOS.map(function(x){return '<div style="margin-top:6px;padding-top:6px;border-top:1px solid #cfe2f3"><b>'+esc(x.nombre)+'</b> · '+esc(x.grupo)+' <span class="ayuda">· desde el '+esc(x.desde)+(x.enc?' · encargado: '+esc(x.enc):'')+'</span></div>';}).join(''):'')+'</div>';}
+  (NUEVOS_AB?NUEVOS.map(function(x){return '<div style="margin-top:6px;padding-top:6px;border-top:1px solid #cfe2f3"><b>'+esc(x.nombre)+'</b> · '+esc(x.grupo)+' <span class="ayuda">· desde el '+esc(x.desde)+(x.enc?' · encargado: '+esc(x.enc):'')+'</span>'+(x.url?' <a href="'+esc(x.url)+'" target="_blank" onclick="event.stopPropagation()" style="color:#1565c0;font-size:14px">📋 Ver en la lista</a>':'')+'</div>';}).join(''):'')+'</div>';}
 
 // ---------- 📅 CALENDARIO ----------
 var CAL=null,CAL_OFF=0,CAL_ED=null;
