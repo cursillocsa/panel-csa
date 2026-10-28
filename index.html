@@ -100,6 +100,8 @@ function rapido(acc,params,tipo,clave,ok,mal,refresco){
   },function(e){if(n!==NAV)return;if(String(e.message||'').indexOf('PIN:')>=0){mal(e);return;}
    sbMarca('<span style="color:#c0392b">⚠️ No se pudo confirmar con la planilla (se ve la vista rápida).</span>');});
  },function(){if(n===NAV)pedir(acc,params,function(D){if(n===NAV)ok(D);},function(e){if(n===NAV)mal(e);});});}
+function numBusca(q,nums){var d=String(q).replace(/\D/g,'');if(d.length<4||/[a-záéíóúñ]/i.test(q))return false;d=d.replace(/^595/,'').replace(/^0+/,'');if(d.length<3)return false;
+ return String(nums||'').split(' ').some(function(t){return t&&t.indexOf(d)>=0;});}   // 🔎 buscar por CI o celular
 function el(i){return document.getElementById(i);}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function sa(s){return String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');}
@@ -342,7 +344,7 @@ function marcarExa(i,accion){var x=EXA_V[i],m=el('exM'+i);if(!x)return;var nota=
 function buscadorHtml(tit){return '<div class="card"><h2><span class="paso">1</span>'+esc(tit)+'</h2><div id="pbox">'+
  '<input id="pq" placeholder="Escribí apellido, nombre o ID…" oninput="pfiltrar()" autocomplete="off"><div id="pres" class="res"></div></div></div>';}
 function pfiltrar(){var q=sa(el('pq').value.trim()),r=el('pres');if(q.length<2){r.innerHTML='';return;}
- var p=q.split(/\s+/),h=LISTA.filter(function(x){var t=sa(x[0]+' '+x[2]);return p.every(function(w){return t.indexOf(w)>=0;});}).slice(0,25);
+ var p=q.split(/\s+/),h=LISTA.filter(function(x){var t=sa(x[0]+' '+x[2]);return p.every(function(w){return t.indexOf(w)>=0;})||numBusca(q,x[5]);}).slice(0,25);
  r.innerHTML=h.length?h.map(function(x){return '<div onclick="pelegir(\''+esc(x[1])+'\')">'+esc(x[4])+' <b>'+esc(nombreDe(x))+'</b><br><small>'+esc(x[1])+' · '+esc(x[2])+' · '+esc(x[3])+'</small></div>';}).join(''):'<div class="vacio">No hay coincidencias</div>';}
 function alumno(id){return LISTA.filter(function(x){return x[1]===id;})[0];}
 function pelegir(id){var a=alumno(id);if(!a)return;PICK=a;
@@ -751,7 +753,7 @@ function csContactos(l){var M={},out=[];(l||[]).forEach(function(x){var k=[x.id,
  out.forEach(function(x){if(x.res&&!/^Resuelta/.test(x.aquien))x.aquien+=' ✔';else if(/^Resuelta/.test(x.aquien))x.aquien='✔ Resuelta';});return out;}
 function csSecciones(){var R=csOrdenar(CS_ULT),q=sa(CS_Q.trim()),pal=q?q.split(/\s+/):[];
  var al=function(x){return x.id&&alumno(x.id)?'<span class="cs-al" onclick="perfil(\''+esc(x.id)+'\')">'+esc(x.alumno)+'</span>':esc(x.alumno);};
- var ok=function(x){if(!pal.length)return true;var t=sa((x.alumno||'')+' '+(x.id||''));return pal.every(function(w){return t.indexOf(w)>=0;});};
+ var ok=function(x){if(!pal.length)return true;var t=sa((x.alumno||'')+' '+(x.id||''));if(pal.every(function(w){return t.indexOf(w)>=0;}))return true;var a=x.id&&alumno(x.id);return !!(a&&numBusca(CS_Q,a[5]));};
  var sec=function(k,tit,enc,lista,fila){var l=lista.filter(ok),n=CS_LIM[k],vis=pal.length?l:l.slice(0,n);
   var h=csTabla(tit,enc,vis.map(fila));h=h.replace('<span class="ayuda">('+vis.length+')</span>','<span class="ayuda">('+l.length+')</span>');
   if(!pal.length&&l.length>n)h=h.replace(/<\/div>$/,'<button class="mini" style="margin-top:8px" onclick="csMas(\''+k+'\')">⬇ Ver 10 más (quedan '+(l.length-n)+')</button></div>');
