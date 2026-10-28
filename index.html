@@ -142,13 +142,22 @@ function cargar(){el('app').innerHTML='';msg('Cargando alumnos…');
 el('app').addEventListener('input',function(){TOCADO=true;});
 cargar();
 function conFC(fn){if(FC)fn();else{msg('Cargando…');pedir('formCSA',{},function(d){FC=d;msg('');fn();},function(e){falla(e);});}}
-function pantalla(h){NAV++;sbMarca('');el('volver').style.display='inline-block';msg('');el('app').innerHTML=h;window.scrollTo(0,0);}
+
+// ◀ Volver atrás con el gesto del celular (deslizar) o la flecha del navegador: cada pantalla queda en el historial
+var HIST=[],HIST_OK=!!(window.history&&history.pushState);
+function guardarPantalla(){if(!HIST_OK||!el('app'))return;var v=el('volver')?el('volver').style.display:'';
+ HIST.push({h:el('app').innerHTML,y:window.scrollY,v:v});if(HIST.length>30)HIST.shift();try{history.pushState({gauss:HIST.length},'');}catch(e){}}
+window.addEventListener('popstate',function(){if(typeof NAV!=='undefined')NAV++;var s=HIST.pop();
+ if(!s||s.v==='none'||s.v===''){HIST=[];inicio(true);return;}
+ el('app').innerHTML=s.h;if(el('volver'))el('volver').style.display=s.v;if(typeof msg==='function')msg('');try{if(typeof sbMarca==='function')sbMarca('');}catch(e){}
+ setTimeout(function(){window.scrollTo(0,s.y);},0);});
+function pantalla(h){guardarPantalla();NAV++;sbMarca('');el('volver').style.display='inline-block';msg('');el('app').innerHTML=h;window.scrollTo(0,0);}
 function hecho(t,botones){pantalla('<div class="card ok"><b class="big">✅ '+t+'</b>'+botones+
  '<button class="btn gr" onclick="inicio()">⬅ Volver al inicio</button></div>');}
 function botonPerfil(){return ACTUAL?'<button class="btn az" onclick="perfil(\''+esc(ACTUAL[1])+'\')">👤 Volver al perfil de '+esc(nombreDe(ACTUAL))+'</button>':'';}
 
 // ---------- INICIO ----------
-function inicio(){NAV++;sbMarca('');el('volver').style.display='none';msg('');window.scrollTo(0,0);ACTUAL=null;
+function inicio(desdeHist){if(!desdeHist)HIST=[];NAV++;sbMarca('');el('volver').style.display='none';msg('');window.scrollTo(0,0);ACTUAL=null;
  el('app').innerHTML='<div id="avisosCal"></div><div class="botones">'+
   '<button class="bgrande" style="background:#1f4e79" onclick="buscarPerfil()">👤 Perfil del alumno<small>Asistencia, notas, seguimiento · informe para padres</small></button>'+
   '<button class="bgrande" id="bAlr" style="background:#b71c1c" onclick="alertas()">'+txtBotonAlr()+'</button>'+
