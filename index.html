@@ -198,15 +198,18 @@ function calTxt(x){var t=CAL_TIPO[x.tipo]||CAL_TIPO.Otro;
 function cargarCal(){var pon=function(d){CAL=d;pintarAvisos();};
  sbLeer('csaCal','todo',function(d){pon(d);pedir('calendario',{},pon,function(){});},function(){pedir('calendario',{},pon,function(){});});}
 // Avisos en el inicio: hoy y los próximos 6 días
+var AVISOS_AB=false;
 function pintarAvisos(){var b=el('avisosCal');if(!b||!CAL)return;var h=CAL.hoy,fin=isoMas(h,6);
  var l=CAL.items.filter(function(x){return x.iso>=h&&x.iso<=fin&&(x.tipo!=='Sin clase'||x.grupos.indexOf('Todos')>=0);});
  if(!l.length){b.innerHTML='';return;}
- b.innerHTML='<div class="card" style="border-left:6px solid #1565c0;cursor:pointer" onclick="calendario()"><b>📅 Próximos días</b>'+
-  l.slice(0,6).map(function(x){var t=CAL_TIPO[x.tipo]||CAL_TIPO.Otro;
+ var ex=l.filter(function(x){return x.tipo==='Examen';}).length,hoy=l.filter(function(x){return x.iso===h;}).length;
+ b.innerHTML='<div class="card" style="border-left:6px solid #1565c0;cursor:pointer" onclick="AVISOS_AB=!AVISOS_AB;pintarAvisos()">'+
+  '<b>📅 Próximos días · '+l.length+' actividad'+(l.length>1?'es':'')+'</b>'+
+  '<div class="ayuda">'+(ex?ex+(ex>1?' exámenes':' examen'):'sin exámenes')+(hoy?' · '+hoy+' hoy':'')+' '+(AVISOS_AB?'(tocá para cerrar)':'(tocá para ver)')+'</div>'+
+  (AVISOS_AB?l.map(function(x){var t=CAL_TIPO[x.tipo]||CAL_TIPO.Otro;
    return '<div style="margin-top:6px;padding:6px 8px;border-radius:8px;background:'+t[2]+'"><b>'+(x.iso===h?'HOY':DSEM[x.dow].slice(0,3)+' '+esc(x.fecha))+'</b> · '+
     (x.turno==='Todo el día'?'todo el día':x.turno==='Mañana'?'☀️ mañana':'🌙 tarde')+'<br>'+calTxt(x)+(x.nota?' <span class="ayuda">· '+esc(x.nota)+'</span>':'')+'</div>';}).join('')+
-  (l.length>6?'<div class="ayuda" style="margin-top:4px">y '+(l.length-6)+' más…</div>':'')+
-  '<div class="ayuda" style="margin-top:6px">Tocá para ver el calendario</div></div>';}
+   '<div style="margin-top:8px"><button class="mini" onclick="event.stopPropagation();calendario()">📅 Abrir el calendario</button></div>':'')+'</div>';}
 function calendario(){pantalla('<div class="card">Cargando calendario…</div>');
  rapido('calendario',{},'csaCal','todo',function(d){CAL=d;pintarCal();},function(e){falla(e);});}
 function calMover(n){CAL_OFF=n===0?0:CAL_OFF+n;pintarCal();window.scrollTo(0,0);}
