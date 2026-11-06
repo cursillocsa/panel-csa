@@ -172,6 +172,7 @@ function inicio(desdeHist){if(!desdeHist)HIST=[];NAV++;sbMarca('');el('volver').
   '<button class="bgrande" style="background:#e65100" onclick="contacto()">📞 Registrar contacto<small>Hablé con el alumno o con su familia</small></button>'+
   '<button class="bgrande" style="background:#6a1b9a" onclick="cambiarGrupo()">🔄 Cambiar de grupo<small>Pasar a un alumno a otro grupo</small></button>'+
   '<button class="bgrande" style="background:#455a64" onclick="baja()">🚪 Salió del grupo<small>Cuando un alumno deja el cursillo</small></button>'+
+  '<button class="bgrande" style="background:#00695c" onclick="linksListas()">🔗 Links de listas y notas<small>Lista semanal y carga de notas de un grupo: abrir o copiar el link</small></button>'+
   '<button class="bgrande" style="background:#37474f" onclick="cargasSemana()">📒 Cargas de la semana<small>Observaciones, contactos, justificativos… de sábado a viernes</small></button>'+
   '</div><div class="ayuda" style="text-align:center;margin-top:16px">'+LISTA.length+' alumnos · datos del CSA (se actualizan cada hora)</div>';pintarAvisos();pintarNuevos();}
 // 🆕 nombres que un profe escribió en una lista y no están en Administración (los resuelve la secretaría)
@@ -626,6 +627,28 @@ function pintarGrupoCSA(){var D=GRP_D,g=GRP_G,t=el('lgT');if(!D||!t)return;var n
     '<td class="'+(Number(x.faltas)>0?'r':'')+'">'+esc(x.faltas||0)+'</td>'+
     '<td class="'+(x.prom===''?'':(x.prom<D.notaBaja?'r':(x.prom<D.notaMedia?'y':'g')))+'">'+(x.prom===''?'–':x.prom)+'</td>'+
     '<td class="'+(x.deuda>0?'r':'')+'">'+(x.deuda>0?gs(x.deuda):'–')+'</td></tr>';}).join('')+'</table></div></div>';}
+
+// ---------- 🔗 LINKS DE LISTAS SEMANALES Y CARGA DE NOTAS ----------
+var LK=[];
+function linksListas(){conFC(function(){var g0=guardado('gaussCsaLk');
+ pantalla('<div class="card"><h2>🔗 Links de listas y notas</h2><label>Grupo</label><select id="lkG" onchange="lkVer(0)">'+
+  '<option value=""></option>'+(FC.grupos||[]).map(function(g){return '<option'+(g===g0?' selected':'')+'>'+esc(g)+'</option>';}).join('')+'</select>'+
+  '<div id="lkR" style="margin-top:10px"><div class="ayuda">Elegí un grupo para ver sus links.</div></div></div>');
+ if(g0&&(FC.grupos||[]).indexOf(g0)>=0)lkVer(0);});}
+function lkFila(t,sub,url,extra){var i=LK.push(url)-1;
+ return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid #eee"><div><b>'+t+'</b>'+(sub?'<div class="ayuda">'+sub+'</div>':'')+'</div>'+
+  '<div style="display:flex;gap:6px"><a class="wa" style="background:#1f4e79;text-decoration:none" href="'+esc(url)+'" target="_blank">Abrir</a>'+
+  '<button class="wa" style="background:#555;border:0" onclick="lkCopiar('+i+',this)">Copiar link</button></div></div>';}
+function lkCopiar(i,b){var u=LK[i],ok=function(){var t=b.textContent;b.textContent='✅ Copiado';setTimeout(function(){b.textContent=t;},1500);};
+ try{navigator.clipboard.writeText(u).then(ok,function(){lkViejo(u,ok);});}catch(e){lkViejo(u,ok);}}
+function lkViejo(u,ok){var t=document.createElement('textarea');t.value=u;document.body.appendChild(t);t.select();try{document.execCommand('copy');ok();}catch(e){}document.body.removeChild(t);}
+function lkVer(todas){var g=val('lkG'),r=el('lkR');if(!g){r.innerHTML='<div class="ayuda">Elegí un grupo para ver sus links.</div>';return;}
+ guardado('gaussCsaLk',g);r.innerHTML='<div class="ayuda">Buscando los links… (la primera vez puede tardar unos segundos)</div>';
+ pedir('linksListas',{grupo:g,todas:todas?'1':''},function(D){LK=[];if(val('lkG')!==g)return;
+  var h='<h3 style="margin:6px 0">📝 Carga de notas</h3>'+(D.notas.length?D.notas.map(function(n){return lkFila('📝 '+esc(n.nombre),(n.activa?'Año en curso':'Año cerrado')+' · pestaña de '+esc(D.grupo),n.url);}).join(''):'<div class="ayuda">Todavía no hay planilla de notas para este grupo.</div>');
+  h+='<h3 style="margin:14px 0 6px">📋 Listas semanales</h3>'+(D.listas.length?D.listas.map(function(l){return lkFila((l.actual?'⭐ ':'')+esc(l.desde+' al '+l.hasta+' '+l.anio),(l.actual?'Esta semana · ':'')+esc(l.nombre),l.url);}).join(''):'<div class="ayuda">Todavía no hay listas creadas para este grupo.</div>');
+  if(D.hayMas)h+='<button class="btn gr" onclick="lkVer(1)">Ver las '+D.hayMas+' anteriores</button>';
+  r.innerHTML=h;},function(e){falla(e,'lkR');});}
 
 // ---------- 🖨️ PDF DE NOTAS ----------
 var PN=null;
