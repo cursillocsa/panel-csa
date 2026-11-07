@@ -160,7 +160,9 @@ function botonPerfil(){return ACTUAL?'<button class="btn az" onclick="perfil(\''
 
 // ---------- INICIO ----------
 function inicio(desdeHist){if(!desdeHist)HIST=[];NAV++;sbMarca('');el('volver').style.display='none';msg('');window.scrollTo(0,0);ACTUAL=null;
- el('app').innerHTML='<div id="avisoNuevos"></div><div id="avisosCal"></div><div class="botones">'+
+ el('app').innerHTML='<div id="avisoNuevos"></div><div id="avisosCal"></div>'+
+  '<div class="card" style="padding:10px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><button class="btn" id="bAct" style="width:auto;margin:0;padding:10px 16px;background:#00838f" onclick="actualizarCambios()">🔄 Actualizar cambios</button>'+
+  '<span class="ayuda" id="actTxt" style="flex:1;min-width:160px"></span></div><div class="botones">'+
   '<button class="bgrande" style="background:#1f4e79" onclick="buscarPerfil()">👤 Perfil del alumno<small>Asistencia, notas, seguimiento · informe para padres</small></button>'+
   '<button class="bgrande" id="bAlr" style="background:#b71c1c" onclick="alertas()">'+txtBotonAlr()+'</button>'+
   '<button class="bgrande" id="bExa" style="background:#6a1b9a" onclick="examenes()">'+txtBotonExa()+'</button>'+
@@ -174,7 +176,19 @@ function inicio(desdeHist){if(!desdeHist)HIST=[];NAV++;sbMarca('');el('volver').
   '<button class="bgrande" style="background:#455a64" onclick="baja()">🚪 Salió del grupo<small>Cuando un alumno deja el cursillo</small></button>'+
   '<button class="bgrande" style="background:#00695c" onclick="linksListas()">🔗 Links de listas y notas<small>Lista semanal y carga de notas de un grupo: abrir o copiar el link</small></button>'+
   '<button class="bgrande" style="background:#37474f" onclick="cargasSemana()">📒 Cargas de la semana<small>Observaciones, contactos, justificativos… de sábado a viernes</small></button>'+
-  '</div><div class="ayuda" style="text-align:center;margin-top:16px">'+LISTA.length+' alumnos · datos del CSA (se actualizan cada hora)</div>';pintarAvisos();pintarNuevos();}
+  '</div><div class="ayuda" style="text-align:center;margin-top:16px">'+LISTA.length+' alumnos · datos del CSA (se actualizan solos cada hora, o tocá Actualizar cambios)</div>';pintarAvisos();pintarNuevos();actVer();}
+// 🔄 Actualizar cambios: corre ya la actualización del CSA (justificativos, listas, asistencia, notas)
+var ACT_ULT=0,ACT_BUS=false;
+function actHace(t){if(!t)return 'sin dato';var m=Math.round((Date.now()-t)/60000);return m<1?'recién':m<60?'hace '+m+' min':'hace '+Math.round(m/60)+' h';}
+function actVer(){pedir('actUlt',{},function(d){ACT_ULT=d.ult||0;var e=el('actTxt');if(e)e.textContent='Última actualización: '+actHace(ACT_ULT);},function(){});}
+function actualizarCambios(){if(ACT_BUS)return;ACT_BUS=true;var b=el('bAct'),t=el('actTxt');
+ if(b){b.disabled=true;b.textContent='⏳ Actualizando…';}if(t)t.textContent='Puede tardar 1 o 2 minutos. No cierres la pantalla.';
+ function fin(){ACT_BUS=false;var b2=el('bAct');if(b2){b2.disabled=false;b2.textContent='🔄 Actualizar cambios';}}
+ pedir('actualizar',{},function(d){fin();ACT_ULT=d.ult||Date.now();var t2=el('actTxt');
+   if(d.ocupado){if(t2)t2.innerHTML='<span style="color:#b45f06">⏳ Ya se está actualizando (otra persona o el automático). Probá de nuevo en 1 minuto.</span>';return;}
+   if(t2)t2.innerHTML='<span style="color:#1b8a3a">✅ '+(d.reciente?'Ya estaba actualizado ('+actHace(ACT_ULT)+')':'Actualizado recién')+'.</span> Si abrís un perfil, ya ves lo nuevo.';
+   pedir('lista',{},function(l){LISTA=l;},function(){});cargarNuevos();},
+  function(e){fin();if(falla(e))return;var t3=el('actTxt');if(t3)t3.innerHTML='<span class="err">⚠️ '+esc(String(e.message||e))+'</span>';});}
 // 🆕 nombres que un profe escribió en una lista y no están en Administración (los resuelve la secretaría)
 var NUEVOS=null,NUEVOS_AB=false;
 function cargarNuevos(){pedir('nuevos',{},function(d){NUEVOS=d.lista||[];pintarNuevos();},function(){});}
