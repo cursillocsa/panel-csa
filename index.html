@@ -341,7 +341,8 @@ function pintarExa(){if(!EXA)return;var L=EXA.alertas.filter(exaEnRango),R=exaRa
    (x.waRe?'<a class="wa" style="background:#128c7e" href="'+esc(x.waRe)+'" target="_blank">📲 Responsable'+(x.resp?' ('+esc(x.resp.split(' ')[0])+')':'')+'</a>':(x.sinCelR?'<span class="ayuda">📵 sin cel. resp.</span>':''))+
    (x.justificado?'<button class="mini" style="background:#2e7d32;color:#fff;padding:8px 12px" onclick="formExa('+i+',1)">✔ Visto, cerrar</button>'
     :(est(x)==='esp'?'':'<button class="mini" style="background:#1b8a3a;color:#fff;padding:8px 12px" onclick="formExa('+i+',0,\'contacte\')">📞 Ya contacté</button>')+
-     '<button class="mini" style="background:#1565c0;color:#fff;padding:8px 12px" onclick="formExa('+i+',0,\'resp\')">💬 Cargar respuesta'+(est(x)==='esp'?' del alumno':'')+'</button>')+'</div>'+
+     '<button class="mini" style="background:#1565c0;color:#fff;padding:8px 12px" onclick="formExa('+i+',0,\'resp\')">💬 Cargar respuesta'+(est(x)==='esp'?' del alumno':'')+'</button>')+
+   '<button class="mini" style="background:#37474f;color:#fff;padding:8px 12px" onclick="formExa('+i+',0,\'cerrar\')">🗂️ Cerrar alerta</button></div>'+
    '<div style="margin-top:8px"><a href="javascript:void 0" style="color:#1565c0;font-size:14px;text-decoration:none" onclick="verMasExa('+i+')">'+(ab?'▾ Ver menos':'▸ Ver más')+'</a></div>'+
    (ab?'<div style="background:#f3f5f9;border-radius:8px;padding:10px;margin-top:6px;font-size:14px">'+
      '<div><b>Se detectó por:</b> '+esc(x.origen==='calendario'?'el calendario y la lista del turno':x.origen==='notas'?'las notas (cargaron A)':'el calendario y las notas')+'</div>'+
@@ -352,17 +353,19 @@ function pintarExa(){if(!EXA)return;var L=EXA.alertas.filter(exaEnRango),R=exaRa
 function verMasExa(i){var x=EXA_V[i];if(!x)return;if(EXA_AB[x.clave])delete EXA_AB[x.clave];else EXA_AB[x.clave]=1;var y=window.scrollY;pintarExa();window.scrollTo(0,y);}
 function formExa(i,cerrar,modo){var x=EXA_V[i],d=el('ex'+i+'f');if(!x||!d)return;
  conFC(function(){d.innerHTML='<div style="background:#f3f5f9;border-radius:8px;padding:10px;margin-top:8px">'+
-  (cerrar?'<div class="ayuda">Tiene justificativo: se cierra sin contactar.</div><label>¿Quién lo cierra?</label><select id="exY'+i+'">'+op(FC.profes,quienSoy())+'</select>':
+  (modo==='cerrar'?'<div class="ayuda">Cierra la alerta sin contactar. Queda anotado el motivo.</div>'+motivosCerrar('exC'+i)+'<label>¿Quién la cierra?</label><select id="exY'+i+'">'+op(FC.profes,quienSoy())+'</select>':
+  cerrar?'<div class="ayuda">Tiene justificativo: se cierra sin contactar.</div><label>¿Quién lo cierra?</label><select id="exY'+i+'">'+op(FC.profes,quienSoy())+'</select>':
    '<div class="ayuda">'+(modo==='contacte'?'Queda en <b>📵 Esperando respuesta</b> hasta que cargues lo que contestaron.':'Se cierra la alerta con lo que respondieron.')+'</div>'+
    '<div class="fila2"><div><label>¿Con quién?</label><select id="exQ'+i+'"><option value="alumno">Alumno</option><option value="responsable">Responsable</option><option value="ambos">Los dos</option></select></div>'+
    '<div><label>¿Quién contactó?</label><select id="exY'+i+'">'+op(FC.profes,quienSoy())+'</select></div></div>'+
    '<label>'+(modo==='contacte'?'Nota <span class="ayuda">(opcional)</span>':'¿Qué dijo?')+'</label><input id="exN'+i+'" placeholder="'+(modo==='contacte'?'ej. le escribí por WhatsApp':'ej. estuvo enfermo, trae certificado')+'">')+
   '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">'+
-  (cerrar?'<button class="btn" style="width:auto;padding:10px 16px;background:#2e7d32" onclick="marcarExa('+i+',\'cerrar\')">✔ Cerrar</button>':
+  (modo==='cerrar'?'<button class="btn" style="width:auto;padding:10px 16px;background:#455a64" onclick="marcarExa('+i+',\'cerrar\')">🗂️ Cerrar alerta</button>':cerrar?'<button class="btn" style="width:auto;padding:10px 16px;background:#2e7d32" onclick="marcarExa('+i+',\'cerrar\')">✔ Cerrar</button>':
    modo==='contacte'?'<button class="btn" style="width:auto;padding:10px 16px" onclick="marcarExa('+i+',\'contacte\')">📞 Ya contacté (pasa a esperando)</button>':
    '<button class="btn" style="width:auto;padding:10px 16px;background:#1565c0" onclick="marcarExa('+i+',\'contactado\')">✔ Guardar respuesta y cerrar</button>')+
   '</div><div id="exM'+i+'"></div></div>';});}
-function marcarExa(i,accion){var x=EXA_V[i],m=el('exM'+i);if(!x)return;var nota=val('exN'+i).trim(),quien=val('exY'+i);
+function marcarExa(i,accion){var x=EXA_V[i],m=el('exM'+i);if(!x)return;var nota=el('exN'+i)?val('exN'+i).trim():'',quien=val('exY'+i);
+ if(accion==='cerrar'&&el('exC'+i+'S')){var mot=motivoCerrar('exC'+i);if(mot===null){m.innerHTML='<div class="err">Escribí el motivo (una nota corta).</div>';return;}nota=mot;}
  if(accion==='contactado'&&!nota){m.innerHTML='<div class="err">Escribí qué te dijeron (una nota corta).</div>';return;}
  if(quien)guardado('gaussCsaYo',quien);m.innerHTML='<div class="ayuda">Guardando…</div>';
  pedir('examenMarcar',{clave:x.clave,que:accion,aquien:val('exQ'+i),nota:nota,quien:quien,alumno:x.alumno,grupo:x.grupo,examen:(x.materia||'examen')+' del '+x.diaTxt},function(){
@@ -533,7 +536,8 @@ function pintarAlertas(){if(!ALR)return;var L0=ALR.alertas.filter(alrEnRango),R=
    '<button class="mini" style="background:#1b8a3a;color:#fff;padding:8px 12px" onclick="formContacte('+i+')">📞 Ya contacté</button>'+
    '<button class="mini" style="background:#1565c0;color:#fff;padding:8px 12px" onclick="formRespuesta('+i+')">💬 Cargar respuesta'+(es==='esp'?' del alumno':'')+'</button>'+
    (es!=='posp'?'<button class="mini" style="background:#455a64;color:#fff;padding:8px 12px" onclick="posponerAlerta('+i+',this)">⏸️ Posponer 3 días</button>':'')+
-   (fs?'<button class="mini" style="background:'+(x.volvio?'#2e7d32':'#888')+';color:#fff;padding:8px 12px" onclick="formVolvio('+i+')">✅ Volvió solo, cerrar</button>':'')+'</div>'+
+   (fs?'<button class="mini" style="background:'+(x.volvio?'#2e7d32':'#888')+';color:#fff;padding:8px 12px" onclick="formVolvio('+i+')">✅ Volvió solo, cerrar</button>':'')+
+   '<button class="mini" style="background:#37474f;color:#fff;padding:8px 12px" onclick="formCerrarAl('+i+')">🗂️ Cerrar alerta</button></div>'+
    '<div style="margin-top:8px"><a href="javascript:void 0" style="color:#1565c0;font-size:14px;text-decoration:none" onclick="verMasAlr('+i+')">'+(ab?'▾ Ver menos':'▸ Ver más')+'</a></div>'+
    (ab?masAlr(x):'')+
    '<div id="'+k+'f"></div></div>';});
@@ -570,6 +574,19 @@ function masAlr(x){var col={P:['#1b8a3a','vino'],T:['#e0a800','tarde/retiro'],J:
  if(x.examen!==''&&x.examen!==undefined||x.prom!==''&&x.prom!==undefined)h+=fila('📝','Último examen',(x.examen!==''&&x.examen!==undefined?esc(x.examen):'–')+' · promedio '+(x.prom!==''&&x.prom!==undefined?esc(x.prom):'–'));
  if(x.dias15===undefined)h+='<div class="ayuda" style="margin-top:6px">Más datos aparecen con la próxima actualización.</div>';
  return h+'</div>';}
+function motivosCerrar(id){return '<label>¿Por qué se cierra?</label><select id="'+id+'S"><option>✅ Se solucionó</option><option>🙈 Se ignora: ya estaba justificado / avisado</option><option>🙈 Se ignora: ya no está en el grupo</option><option>🙈 Se ignora: error de la lista</option><option>Otro motivo</option></select>'+
+ '<label>Nota <span class="ayuda">(opcional; obligatoria si es "Otro motivo")</span></label><input id="'+id+'N" placeholder="ej. el padre ya habló con el profe">';}
+function motivoCerrar(id){var m=val(id+'S'),n=val(id+'N').trim();if(m==='Otro motivo'&&!n)return null;return m+(n?': '+n:'');}
+function formCerrarAl(i){var x=ALR_VISTA[i],d=el('al'+i+'f');if(!x||!d)return;
+ conFC(function(){d.innerHTML='<div style="background:#f3f5f9;border-radius:8px;padding:10px;margin-top:8px"><div class="ayuda">Cierra la alerta sin contactar. Queda anotado el motivo.</div>'+motivosCerrar('acA'+i)+
+  '<label>¿Quién la cierra?</label><select id="acY'+i+'">'+op(FC.profes,quienSoy())+'</select>'+
+  '<div style="margin-top:8px"><button class="btn" style="width:auto;padding:10px 16px;background:#455a64" onclick="cerrarAl('+i+')">🗂️ Cerrar alerta</button></div><div id="acM'+i+'"></div></div>';});}
+function cerrarAl(i){var x=ALR_VISTA[i],m=el('acM'+i);if(!x)return;var mot=motivoCerrar('acA'+i),quien=val('acY'+i);
+ if(mot===null){m.innerHTML='<div class="err">Escribí el motivo (una nota corta).</div>';return;}
+ if(quien)guardado('gaussCsaYo',quien);m.innerHTML='<div class="ayuda">Guardando…</div>';
+ pedir('alertaMarcar',{clave:x.clave,otras:otras(x),que:'cerrar',nota:mot,quien:quien},function(){
+  ALR.alertas=ALR.alertas.filter(function(a){return a.clave!==x.clave;});var b=el('bAlr');if(b)b.innerHTML=txtBotonAlr();
+  var y=window.scrollY;pintarAlertas();window.scrollTo(0,y);},function(e){falla(e,'acM'+i);});}
 function formVolvio(i){var x=ALR_VISTA[i],d=el('al'+i+'f');if(!x||!d)return;
  conFC(function(){d.innerHTML='<div style="background:#eef7ee;border-radius:8px;padding:10px;margin-top:8px">'+
   '<div class="ayuda">Se cierra la alerta sin contactar porque el alumno ya volvió.'+(x.volvio?'':' <b>Ojo:</b> todavía no figura que haya vuelto en las listas.')+'</div>'+
