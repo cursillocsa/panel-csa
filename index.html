@@ -696,23 +696,33 @@ function pdfNotas(){var seguir=function(){
  pantalla('<div class="card"><h2>🖨️ PDF de notas de un grupo</h2>'+
   '<label>Planilla</label><select id="nP" onchange="nGrupos()">'+PN.map(function(p,i){return '<option value="'+i+'">'+esc(p.nombre)+'</option>';}).join('')+'</select>'+
   '<label>Grupo</label><select id="nG" onchange="nExs()"></select>'+
-  '<label>¿Qué exámenes?</label><select id="nM" onchange="nExs()"><option value="uno">Solo un examen</option><option value="todos">Todos los exámenes del grupo</option></select>'+
+  '<label>¿Qué exámenes?</label><select id="nM" onchange="nExs()"><option value="uno">Solo un examen</option><option value="elegir">Elegir exámenes manualmente</option><option value="todos">Todos los exámenes del grupo</option></select>'+
   '<div id="nEw"><label>Examen</label><select id="nE"></select></div>'+
+  '<div id="nCw" style="display:none"><label>Marcá los exámenes que van en el PDF</label><div id="nC"></div>'+
+   '<div class="ayuda" style="margin-top:6px"><a href="#" onclick="nMarcar(true);return false">Marcar todos</a> · <a href="#" onclick="nMarcar(false);return false">Ninguno</a></div></div>'+
   '<button class="btn" id="nB" onclick="nGenerar()">🖨️ Generar PDF</button><div id="nR" style="margin-top:10px"></div></div>');
  var g=guardado('gaussCsaNotas').split('|');if(g[0]&&PN[g[0]])el('nP').value=g[0];nGrupos();if(g[1]&&el('nG').options[g[1]])el('nG').value=g[1];nExs();};
  if(PN)seguir();else{msg('Cargando planillas de notas… (puede tardar unos segundos)');
   var pl=function(){pedir('notasDatos',{},function(d){PN=d;msg('');seguir();},function(e){falla(e);});};
   sbLeer('csaNotas','todo',function(d){PN=d;msg('');seguir();pedir('notasDatos',{},function(d2){PN=d2;},function(){});},pl);}}
 function nGrupos(){var p=PN[el('nP').value];el('nG').innerHTML=p.grupos.map(function(g,i){return '<option value="'+i+'">'+esc(g.nombre)+(g.ex.length?'':' (sin notas)')+'</option>';}).join('');nExs();}
-function nExs(){var g=PN[el('nP').value].grupos[el('nG').value],todos=el('nM').value==='todos';el('nR').innerHTML='';
- el('nEw').style.display=todos?'none':'block';
+function nMarcar(v){var c=document.querySelectorAll('.nCk');for(var i=0;i<c.length;i++)c[i].checked=v;}
+function nExs(){var g=PN[el('nP').value].grupos[el('nG').value],modo=el('nM').value,todos=modo==='todos';el('nR').innerHTML='';
+ el('nEw').style.display=modo==='uno'?'block':'none';
+ el('nCw').style.display=modo==='elegir'?'block':'none';
+ el('nC').innerHTML=g&&g.ex.length?g.ex.slice().reverse().map(function(e){return '<label style="display:flex;align-items:center;gap:10px;font-weight:normal;margin:6px 0"><input type="checkbox" class="nCk" value="'+e.col+'" style="width:auto;margin:0;transform:scale(1.4);flex:none"><span>'+esc(e.texto)+'</span></label>';}).join(''):'<div class="ayuda">— sin notas cargadas —</div>';
  el('nE').innerHTML=g&&g.ex.length?g.ex.slice().reverse().map(function(e){return '<option value="'+e.col+'">'+esc(e.texto)+'</option>';}).join(''):'<option value="">— sin notas cargadas —</option>';}
 function nGenerar(){var p=PN[el('nP').value],g=p.grupos[el('nG').value],r=el('nR');
  if(!g||!g.ex.length){r.innerHTML='<div class="err">Ese grupo todavía no tiene notas cargadas.</div>';return;}
- var cols=el('nM').value==='todos'?g.ex.map(function(e){return e.col;}):[el('nE').value];
+ var modo=el('nM').value,cols;
+ if(modo==='todos')cols=g.ex.map(function(e){return e.col;});
+ else if(modo==='elegir'){cols=[];var ck=document.querySelectorAll('.nCk');for(var i=0;i<ck.length;i++)if(ck[i].checked)cols.push(Number(ck[i].value));
+  if(!cols.length){r.innerHTML='<div class="err">Marcá al menos un examen.</div>';return;}
+  cols.sort(function(a,b){return a-b;});}
+ else cols=[el('nE').value];
  guardado('gaussCsaNotas',el('nP').value+'|'+el('nG').value);
  var b=el('nB');b.disabled=true;b.textContent='Generando… (unos segundos)';r.innerHTML='';
- pedir('pdfNotas',{archivo:p.id,hoja:g.nombre,cols:cols.join(',')},function(x){b.disabled=false;b.textContent='🖨️ Generar PDF';
+ pedir('pdfNotas',{archivo:p.id,hoja:g.nombre,cols:cols.join(','),sel:modo==='elegir'?'1':''},function(x){b.disabled=false;b.textContent='🖨️ Generar PDF';
   r.innerHTML='✅ '+esc(x.nombre)+'<br><a class="wa" style="background:#1f4e79" href="'+esc(x.ver)+'" target="_blank">👁️ Ver PDF</a>'+
    '<a class="wa" style="background:#555" href="'+esc(x.bajar)+'" target="_blank">⬇️ Descargar</a>'+
    '<div class="ayuda" style="margin-top:6px">Queda guardado en la carpeta PDF NOTAS, al lado de la planilla de notas.</div>';},
@@ -923,4 +933,5 @@ function gbPintar(filtro){
  var inp=document.getElementById('gbF');if(inp&&filtro){inp.focus();try{inp.setSelectionRange(filtro.length,filtro.length);}catch(e){}}}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',gbInit);else gbInit();
 
-</script></body></html>
+</script><div id="verTxt" style="text-align:center;color:#999;font-size:12px;padding:14px 0 24px">Panel CSA 3q</div>
+</body></html>
