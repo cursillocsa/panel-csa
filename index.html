@@ -56,9 +56,13 @@ td{padding:5px;border-bottom:1px solid #eee;vertical-align:top}
 tr.clic{cursor:pointer}tr.clic:hover td{background:#e8f0fe}
 .wa{display:inline-block;background:#25d366;color:#fff;text-decoration:none;padding:7px 12px;border-radius:18px;margin:6px 6px 0 0;font-weight:bold;font-size:13px}
 .vacio{color:#999;font-style:italic}
+#colaIns{position:sticky;top:60px;z-index:4;padding:0 12px}#colaIns .ci{border-radius:10px;padding:10px 12px;margin-top:8px;box-shadow:0 2px 8px rgba(0,0,0,.25);font-size:14px}
+#colaIns .ciy{background:#fff2cc;border:2px solid #f1c232}#colaIns .cir{background:#fdecea;border:2px solid #c0392b}#colaIns .cig{background:#d9ead3;border:2px solid #6aa84f}
+#colaIns .cb{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 header h1 span.tit{color:inherit}h1 .tit{cursor:pointer;-webkit-tap-highlight-color:transparent}h1 .tit:active{opacity:.6}
 </style></head><body>
 <header><h1><span class="tit" onclick="if(LISTA&&LISTA.length)inicio()" title="Ir al inicio">🎓 Panel CSA <span>Gauss</span></span></h1><button id="volver" onclick="inicio()">⬅ Inicio</button></header>
+<div id="colaIns"><div id="cgQ"></div><div id="ciO"></div></div>
 <main><div id="app"></div><div id="msg">Cargando…</div></main>
 <script>
 // ===== Links de las dos aplicaciones web =====
@@ -114,16 +118,30 @@ function guardado(k,v){try{if(v===undefined)return localStorage.getItem(k)||'';l
 function msg(t){el('msg').innerHTML=t||'';}
 function nombreDe(a){return String(a[0]).split(' · ').slice(1).join(' · ')||a[0];}
 
-function llamar(api,donde,acc,params,ok,mal){
+// 3t: si la planilla está ocupada, lo que se carga no se pierde ni hay que reintentar a mano
+// · COLA_G: formularios que, si la planilla está ocupada, quedan guardados en este navegador y se guardan solos en segundo plano
+// · REINTENTA: acciones de los botones de alertas / exámenes / calendario: se reintentan solas unas veces y, si no, muestran el error
+var COLA_G={justificativo:'Justificativo',observacion:'Observación',contacto:'Contacto',cambioGrupo:'Cambio de grupo',baja:'Salida del grupo'};
+var REINTENTA={alertaMarcar:1,examenMarcar:1,calGuardar:1,calBorrar:1,nuevoResolver:1};
+function ocupadoErr(m){m=String(m||'');return m.indexOf('PIN:')<0&&/ocupada|otra actualizaci|otro guardado|se est[aá] actualizando|^Prob[aá] (de nuevo|en un minuto)/i.test(m);}
+function llamar(api,donde,acc,params,ok,mal,opt){
  var q='accion='+acc+'&pin='+encodeURIComponent(PIN);
  for(var k in params)q+='&'+k+'='+encodeURIComponent(params[k]==null?'':params[k]);
- fetch(api+'?'+q,{credentials:'omit'}).then(function(r){return r.json();})
- .then(function(d){if(d&&d.error)mal({message:d.error,adm:donde==='adm'});else ok(d);})
- .catch(function(){mal({message:'No pude conectar con '+(donde==='adm'?'Administración':'el CSA')+'. Revisá la conexión y probá de nuevo.'});});}
-function pedir(acc,params,ok,mal){
+ var sinCola=!!(opt&&opt.sinCola),intento=0;
+ var ir=function(){fetch(api+'?'+q,{credentials:'omit'}).then(function(r){return r.json();})
+ .then(function(d){
+  if(d&&d.error){
+   if(!sinCola&&ocupadoErr(d.error)){
+    // el servidor ya esperó ~20 s por su turno: lo que es formulario queda en segundo plano apenas falla
+    if(COLA_G[acc]){if(intento)msg('');colaEncolar(acc,params,donde);return;}
+    if(REINTENTA[acc]&&intento<3){intento++;msg('<span class="ayuda">⏳ La planilla está ocupada. Reintento solo… ('+intento+'/3)</span>');setTimeout(ir,4000);return;}}
+   if(intento)msg('');mal({message:d.error,adm:donde==='adm'});}
+  else{if(intento)msg('');ok(d);}})
+ .catch(function(){mal({message:'No pude conectar con '+(donde==='adm'?'Administración':'el CSA')+'. Revisá la conexión y probá de nuevo.'});});};ir();}
+function pedir(acc,params,ok,mal,opt){
  if(API_CSA.indexOf('PEGAR')===0){mal({message:'Falta pegar el link del CSA en este archivo (línea API_CSA).'});return;}
- llamar(API_CSA,'csa',acc,params,ok,mal);}
-function pedirAdm(acc,params,ok,mal){llamar(API_ADM,'adm',acc,params,ok,mal);}
+ llamar(API_CSA,'csa',acc,params,ok,mal,opt);}
+function pedirAdm(acc,params,ok,mal,opt){llamar(API_ADM,'adm',acc,params,ok,mal,opt);}
 function falla(e,dest){var m=String(e.message||e);
  if(m.indexOf('PIN:')>=0){
   if(e.adm)m='Administración no aceptó el PIN. Falta cargar el "PIN de CSA" en CONFIG de Administración (con la misma clave que este panel).';
@@ -157,6 +175,55 @@ function pantalla(h){guardarPantalla();NAV++;sbMarca('');el('volver').style.disp
 function hecho(t,botones){pantalla('<div class="card ok"><b class="big">✅ '+t+'</b>'+botones+
  '<button class="btn gr" onclick="inicio()">⬅ Volver al inicio</button></div>');}
 function botonPerfil(){return ACTUAL?'<button class="btn az" onclick="perfil(\''+esc(ACTUAL[1])+'\')">👤 Volver al perfil de '+esc(nombreDe(ACTUAL))+'</button>':'';}
+
+// ---------- ⏳ COLA EN SEGUNDO PLANO (3t): justificativo, observación, contacto, cambio de grupo y salida ----------
+// Si la planilla está ocupada, la acción queda guardada en este navegador y se reintenta sola (aunque cierres el panel).
+// Solo se encola cuando el error es "ocupada" (no llegó a escribir nada); los errores de datos se muestran como siempre.
+var CG_KEY='gaussColaCSA',CG_T=null,CG_RUN=false;
+function cgLeer(){try{return JSON.parse(localStorage.getItem(CG_KEY)||'[]');}catch(e){return [];}}
+function cgGuardar(l){try{localStorage.setItem(CG_KEY,JSON.stringify(l));}catch(e){}}
+function colaEncolar(acc,params,donde){
+ var al=params.id?alumno(params.id):null,txt=COLA_G[acc]+(al?' · '+nombreDe(al):''),l=cgLeer();
+ l.push({id:'g'+Date.now()+Math.random().toString(36).slice(2,6),acc:acc,donde:donde,params:params,txt:txt,est:'espera',n:0,t:Date.now(),tk:0,msg:''});cgGuardar(l);
+ NAV++;sbMarca('');msg('');window.scrollTo(0,0);el('volver').style.display='inline-block';
+ el('app').innerHTML='<div class="card" style="background:#fff2cc"><b class="big">⏳ '+esc(txt)+': quedó guardado</b>'+
+  'La planilla estaba ocupada. <b>No lo cargues de nuevo</b>: se guarda solo apenas se libere y te aviso arriba.'+
+  '<div class="ayuda" style="margin-top:6px">Aunque cierres el panel, queda guardado en este navegador y sigue intentando cuando lo abras.</div>'+
+  '<button class="btn gr" onclick="inicio()">⬅ Volver al inicio</button></div>';
+ cgPintar();cgSig(6000);}
+function cgSig(ms){clearTimeout(CG_T);if(!cgLeer().some(function(j){return j.est==='espera';}))return;CG_T=setTimeout(cgCorrer,ms||8000);}
+function cgCorrer(){clearTimeout(CG_T);if(CG_RUN)return;
+ var l=cgLeer(),j=l.filter(function(x){return x.est==='espera'&&!(x.tk&&Date.now()-x.tk<120000);})[0];   // tk: otra pestaña la está corriendo
+ if(!j){cgSig(15000);return;}
+ if(!PIN){cgSig(15000);return;}
+ j.tk=Date.now();cgGuardar(l);CG_RUN=true;
+ (j.donde==='adm'?pedirAdm:pedir)(j.acc,j.params,function(r){CG_RUN=false;cgListo(j,r);},function(e){CG_RUN=false;
+  var t=String(e.message||e),l2=cgLeer(),k=l2.filter(function(x){return x.id===j.id;})[0];if(!k){cgSig(3000);return;}
+  k.tk=0;
+  if(ocupadoErr(t)||/^No pude conectar/i.test(t)){k.n=(k.n||0)+1;cgGuardar(l2);cgPintar();cgSig(Math.min(8000+k.n*2000,20000));return;}
+  k.est='error';k.msg=t;cgGuardar(l2);cgPintar();cgSig(2000);},{sinCola:true});}
+function cgListo(j,r){
+ cgGuardar(cgLeer().filter(function(x){return x.id!==j.id;}));cgPintar();
+ var a=j.params.id?alumno(j.params.id):null;
+ if(a&&j.acc==='cambioGrupo'&&r&&r.grupo)a[2]=r.grupo;
+ if(a&&j.acc==='baja')a[3]='Salió';
+ var c=document.createElement('div');c.className='ci cig';
+ c.innerHTML='<b>✅ '+esc(j.txt)+': ya se guardó</b>'+
+  (j.acc==='cambioGrupo'&&r&&r.grupo?' · pasó a '+esc(r.grupo)+'<div class="ayuda">Sumalo al grupo de WhatsApp nuevo.</div>':'')+
+  (j.acc==='baja'?'<div class="ayuda">Acordate de sacarlo del grupo de WhatsApp.</div>':'')+
+  '<div class="cb"><button class="mini" onclick="var n=this.parentNode.parentNode;n.parentNode.removeChild(n)">✖ Cerrar</button></div>';
+ el('ciO').appendChild(c);cgSig(1500);}
+function cgAccion(id,que){var l=cgLeer(),k=l.filter(function(x){return x.id===id;})[0];if(!k)return;
+ if(que==='descartar'){if(!confirm('¿Descartar "'+k.txt+'"? NO se va a guardar en la planilla.'))return;cgGuardar(l.filter(function(x){return x.id!==id;}));cgPintar();cgSig(2000);return;}
+ k.est='espera';k.msg='';k.tk=0;cgGuardar(l);cgPintar();cgCorrer();}
+function cgPintar(){var b=el('cgQ');if(!b)return;var h='';
+ cgLeer().forEach(function(j){var id=esc(j.id);
+  if(j.est==='error')h+='<div class="ci cir">🛑 <b>No se pudo guardar: '+esc(j.txt)+'</b><div class="err" style="margin-top:4px">'+esc(j.msg||'')+'</div><div class="ayuda">Sigue guardado: no se perdió.</div><div class="cb">'+
+   '<button class="mini" onclick="cgAccion(\''+id+'\',\'reintentar\')">🔁 Reintentar</button><button class="mini" style="background:#999" onclick="cgAccion(\''+id+'\',\'descartar\')">🗑️ Descartar</button></div></div>';
+  else h+='<div class="ci ciy">⏳ <b>Guardando: '+esc(j.txt)+'…</b><div class="ayuda">Quedó a salvo: la planilla estaba ocupada. Se reintenta sola'+(j.n?' (intento '+(j.n+1)+')':'')+'. <b>No lo cargues de nuevo.</b></div>'+
+   '<div class="cb"><button class="mini" onclick="cgAccion(\''+id+'\',\'reintentar\')">🔁 Reintentar ahora</button><button class="mini" style="background:#999" onclick="cgAccion(\''+id+'\',\'descartar\')">🗑️ Descartar</button></div></div>';});
+ b.innerHTML=h;}
+setTimeout(function(){cgPintar();cgCorrer();},3500);
 
 // ---------- INICIO ----------
 function inicio(desdeHist){if(!desdeHist)HIST=[];NAV++;sbMarca('');el('volver').style.display='none';msg('');window.scrollTo(0,0);ACTUAL=null;
@@ -801,12 +868,12 @@ function cambiarGrupo(id){conFI(function(){abrir('¿Qué alumno cambia de grupo?
   '<div class="ayuda">Ahora está en: <b>'+esc(a[2]||'—')+'</b></div>'+
   '<label>Pasa a <span class="req">*</span></label><select id="cgG"><option value=""></option>'+
   Object.keys(mods).map(function(m){return '<optgroup label="'+esc(m)+'">'+mods[m].map(function(g){return '<option value="'+esc(g.cod)+'">'+esc(g.nombre)+'</option>';}).join('')+'</optgroup>';}).join('')+'</select>'+
-  '<label>Desde el día <span class="req">*</span></label><input type="date" id="cgF" value="'+hoyIso()+'">'+
+  '<label>Desde el día <span class="req">*</span></label><input type="date" id="cgF" value="" required><div class="ayuda">Obligatoria: elegí el día del cambio.</div>'+
   '<div class="ayuda" style="margin-top:8px">Se cierra la inscripción de antes ese día y se crea la nueva. La cuota la revisa secretaría (le llega un aviso). En el CSA se ve en la próxima actualización.</div>'+
   '<button class="btn" id="cgB" onclick="guardarCambio()">🔄 Cambiar de grupo</button><div id="cgM"></div></div>';},id);});}
 function guardarCambio(){var a=PICK,g=el('cgG').value,m=el('cgM');
  if(!g){m.innerHTML='<div class="err">Elegí el grupo nuevo.</div>';return;}
- if(!el('cgF').value){m.innerHTML='<div class="err">Elegí la fecha.</div>';return;}
+ if(!el('cgF').value){m.innerHTML='<div class="err">La fecha del cambio es obligatoria.</div>';return;}
  var gn=FI.grupos.filter(function(x){return x.cod===g;})[0];
  if(!confirm('¿Pasar a '+nombreDe(a)+'\nde '+(a[2]||'?')+' a '+gn.nombre+'\ndesde el '+fecha(el('cgF').value)+'?'))return;
  var b=el('cgB');b.disabled=true;b.textContent='Guardando…';ACTUAL=a;
@@ -938,5 +1005,5 @@ function gbPintar(filtro){
  var inp=document.getElementById('gbF');if(inp&&filtro){inp.focus();try{inp.setSelectionRange(filtro.length,filtro.length);}catch(e){}}}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',gbInit);else gbInit();
 
-</script><div id="verTxt" style="text-align:center;color:#999;font-size:12px;padding:14px 0 24px">Panel CSA 3r</div>
+</script><div id="verTxt" style="text-align:center;color:#999;font-size:12px;padding:14px 0 24px">Panel CSA 3t</div>
 </body></html>
