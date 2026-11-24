@@ -924,13 +924,13 @@ function csK(t,v){return '<div class="cs-k"><span>'+esc(t)+'</span><b>'+v+'</b><
 function csMil(n){return Math.round(Number(n)||0).toLocaleString('es-PY');}
 
 function CS_PEDIR(a,p,ok,mal){if(p.desde||p.hasta){NAV++;sbMarca('');pedir(a,p,ok,mal);return;}rapido(a,p,'csaCargas',p.anterior==='1'?'anterior':'actual',ok,mal);}
-function csPintar(R){CS_ULT=R;CS_LIM={obs:10,contactos:10,justif:10,informes:10};
+function csPintar(R){CS_ULT=R;CS_LIM={obs:10,contactos:10,justif:10,informes:10,cambios:10};
  var h='<div class="card"><h2>Del '+esc(R.desde)+' al '+esc(R.hasta)+'</h2><div class="cs-res">'+
-  csK('Observaciones',R.obs.length)+csK('Contactos',csContactos(R.contactos).length)+csK('Justificativos',R.justif.length)+csK('Informes padres',R.informes.length)+'</div>'+
+  csK('Observaciones',R.obs.length)+csK('Contactos',csContactos(R.contactos).length)+csK('Justificativos',R.justif.length)+csK('Cambios de grupo',(R.cambios||[]).length)+csK('Informes padres',R.informes.length)+'</div>'+
   '<label>🔎 Buscar un alumno en estas cargas</label><input id="csQ" placeholder="Apellido, nombre o ID…" value="'+esc(CS_Q)+'" oninput="CS_Q=this.value;csListas()" autocomplete="off">'+
   '<div class="ayuda" style="margin-top:6px">Busca en el período elegido. Para buscar más atrás, usá "Elegir fechas". Tocá un nombre para abrir su perfil.</div></div><div id="csL">'+csSecciones()+'</div>';
  return h;}
-var CS_Q='',CS_LIM={obs:10,contactos:10,justif:10,informes:10};
+var CS_Q='',CS_LIM={obs:10,contactos:10,justif:10,informes:10,cambios:10};
 function csListas(){var y=window.scrollY;if(el('csL'))el('csL').innerHTML=csSecciones();window.scrollTo(0,y);}
 function csMas(k){CS_LIM[k]+=10;csListas();}
 // un contacto marcado desde las alertas queda 2 veces (con quién + "Resuelta"): se muestra en una sola fila
@@ -948,6 +948,8 @@ function csSecciones(){var R=csOrdenar(CS_ULT),q=sa(CS_Q.trim()),pal=q?q.split(/
  return sec('obs','📝 Observaciones',['Día','Alumno','Tipo','Detalle','Resultado','Anotó'],R.obs,function(x){return [esc(x.dia),al(x),esc(x.tipo),esc(x.detalle),esc(x.resultado),esc(x.quien)];})+
   sec('contactos','📞 Contactos',['Día','Alumno','Con quién','Motivo','Por','Nota'],csContactos(R.contactos),function(x){return [esc(x.dia),al(x),esc(x.aquien),esc(x.motivo),esc(x.medio),esc(x.nota)];})+
   sec('justif','🩺 Justificativos',['Cargado','Alumno','Desde','Hasta','Motivo','Quién justificó','A quién'],R.justif,function(x){return [esc(x.dia),al(x),esc(x.desde),esc(x.hasta),esc(x.motivo),esc(x.quien),esc(x.aquien)];})+
+  sec('cambios','🔄 Cambios de grupo',['Día','Alumno','De','A','Cómo','Quién'],R.cambios||[],function(x){return [esc(x.dia),al(x),esc(x.de),esc(x.a),esc(x.como||'Cambio de grupo'),esc(x.quien||'')];})+
+  (R.cambiosError?'<div class="aviso">⚠️ No pude leer los cambios de grupo de Administración: '+esc(R.cambiosError)+'</div>':'')+
   sec('informes','📄 Informes para padres',['Día','Alumno','Grupo','Generado por'],R.informes,function(x){return [esc(x.dia),al(x),esc(x.grupo),esc(x.quien)];});}
 
 function gbPedir(ok,mal){pedir('gruposResumen',{},ok,mal);}
@@ -1005,5 +1007,5 @@ function gbPintar(filtro){
  var inp=document.getElementById('gbF');if(inp&&filtro){inp.focus();try{inp.setSelectionRange(filtro.length,filtro.length);}catch(e){}}}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',gbInit);else gbInit();
 
-</script><div id="verTxt" style="text-align:center;color:#999;font-size:12px;padding:14px 0 24px">Panel CSA 3t</div>
+</script><div id="verTxt" style="text-align:center;color:#999;font-size:12px;padding:14px 0 24px">Panel CSA 3u</div>
 </body></html>
